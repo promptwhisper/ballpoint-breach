@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>BALLPOINT BREACH</title>
+  </head>
+  <body>
+    <canvas id="app"></canvas>
+    <div id="paper-lines" aria-hidden="true"></div>
+    <div id="vignette" aria-hidden="true"></div>
+
+    <section id="hud" aria-label="Game status">
+      <div class="hud-score">SCORE <strong data-hud="score">0</strong></div>
+      <div class="hud-wave"><strong data-hud="wave">WAVE 1</strong><small data-hud="enemies">0 enemies left</small></div>
+
+      <div id="boss-health">
+        <strong data-hud="boss-name">THE DOODLER</strong>
+        <i data-hud="boss-bar"></i>
+      </div>
+
+      <div class="hud-health"><span>HP</span><i data-hud="health-bar"></i><b data-hud="health">100</b></div>
+      <div class="hud-ammo"><strong data-hud="ammo">30</strong><span data-hud="reserve">/150</span><div class="ammo-ticks">//// //// //// //// //</div></div>
+
+      <div class="hud-weapons">
+        <ol>
+          <li data-weapon-slot="1" class="selected"><span>RIFLE</span><em data-weapon-ammo>30/150</em></li>
+          <li data-weapon-slot="2"><span>SHOTGUN</span><em data-weapon-ammo>6/30</em></li>
+          <li data-weapon-slot="3"><span>REVOLVER</span><em data-weapon-ammo>6/36</em></li>
+          <li data-weapon-slot="4"><span>SNIPER</span><em data-weapon-ammo>5/25</em></li>
+          <li data-weapon-slot="5"><span>KATANA</span><em data-weapon-ammo>∞</em></li>
+        </ol>
+        <strong data-hud="weapon-name">RIFLE</strong>
+        <small data-hud="weapon-description">auto · aim for the holo sight</small>
+      </div>
+
+      <div class="ability-meter grapple-meter"><span>Q · GRAPPLE</span><i data-hud="grapple-bar"></i></div>
+      <div id="block-stamina" class="ability-meter"><span>BLOCK</span><i data-hud="block-bar"></i></div>
+
+      <div id="context-tip">grapple an enemy to yank them off a ledge</div>
+      <div id="wave-banner"><strong id="wave-banner-title">WAVE 1</strong><span id="wave-banner-subtitle">THE INK IS STILL WET</span></div>
+      <div class="crosshair"><i></i><i></i><i></i><i></i></div>
+      <div id="hit-marker"><i></i><i></i><i></i><i></i></div>
+      <div id="damage-indicator"></div>
+      <div id="scope-overlay"><div class="scope-reticle"><i></i><i></i></div></div>
+    </section>
+
+    <section id="game-overlay" class="visible" data-mode="loading">
+      <div class="overlay-card">
+        <p class="eyebrow">A BALLPOINT-PEN ARENA FPS</p>
+        <h1 id="overlay-title">BALLPOINT<br>BREACH</h1>
+        <p id="overlay-copy">sharpening pencils…</p>
+        <button id="start-button" type="button" disabled>CLICK TO ENTER THE PAGE</button>
+        <button id="restart-button" type="button" hidden>DRAW AGAIN</button>
+        <div class="controls-grid">
+          <span><b>WASD</b> MOVE</span><span><b>SHIFT</b> SPRINT</span><span><b>SPACE</b> JUMP</span>
+          <span><b>1–5</b> WEAPONS</span><span><b>R</b> RELOAD</span><span><b>Q</b> GRAPPLE</span>
+          <span><b>LMB</b> ATTACK</span><span><b>RMB</b> AIM / BLOCK</span><span><b>ESC</b> PAUSE</span>
+        </div>
+      </div>
+    </section>
+
+    <div id="stage" role="status">BUILD STAGE · PLAYABLE CORE</div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

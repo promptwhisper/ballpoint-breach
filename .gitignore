@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+*.webm
+*.mp4
+coverage/
+.media2threejs/
+recordings/
+.env
+.env.*
+!.env.example

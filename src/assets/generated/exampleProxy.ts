@@ -1,0 +1,2 @@
+import * as THREE from 'three';import type { AssetFactoryResult } from '../../scene/assetRegistry';
+export function createExampleProxy():AssetFactoryResult{const root=new THREE.Group();const body=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({color:0x5b8def}));body.position.y=.5;body.name='body';root.add(body);return{root,nodes:{body},sockets:{},colliders:[{kind:'box',nodeId:'body',size:[1,1,1]}],destructionGroups:{body:[body]},bounds:new THREE.Box3(new THREE.Vector3(-.5,0,-.5),new THREE.Vector3(.5,1,.5)),semanticRegions:{body:[body]}};}

@@ -1,0 +1,2 @@
+import * as THREE from 'three';
+export function applyDebugView(scene:THREE.Scene,params:URLSearchParams):void{const view=params.get('view');for(const light of scene.children.filter(x=>(x as THREE.Light).isLight)){if(view==='sun-only')light.visible=light.name==='direct-sun';}const isolate=params.get('asset');if(isolate)scene.traverse(object=>{if(object.userData.assetId&&object.userData.assetId!==isolate)object.visible=false;});}

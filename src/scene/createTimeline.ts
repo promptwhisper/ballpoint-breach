@@ -1,0 +1,4 @@
+import * as THREE from 'three';
+export interface TransformKeyframe { time:number; position?:[number,number,number]; rotation?:[number,number,number]; visible?:boolean; }
+export interface SerializableTrack { assetId:string; targetType:'node'|'socket'; targetId:string; keyframes:TransformKeyframe[]; }
+export class DeterministicTimeline { constructor(private resolve:(assetId:string,targetType:'node'|'socket',targetId:string)=>THREE.Object3D|undefined,private tracks:SerializableTrack[]){} seek(time:number):void{for(const track of this.tracks){const target=this.resolve(track.assetId,track.targetType,track.targetId);if(!target)continue;const frame=[...track.keyframes].reverse().find(item=>item.time<=time)??track.keyframes[0];if(!frame)continue;if(frame.position)target.position.fromArray(frame.position);if(frame.rotation)target.rotation.set(...frame.rotation);if(frame.visible!==undefined)target.visible=frame.visible;}}}

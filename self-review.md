@@ -1,0 +1,16 @@
+# September 2026 fidelity-pass self-review
+
+This review covers the user-supplied close gameplay frame and the current playable build. The pass is judged against the explicit blood, NPC-irregularity, and ballpoint-linework contracts rather than against the opening composition alone.
+
+| Area | Evidence | Result | Remaining limitation |
+| --- | --- | --- | --- |
+| Persistent death ink | Each regular death schedules two floor pools, three directional streaks, and seven detached satellites. A nearby backing surface adds two torn impact layers, three unequal gravity drips, and five detached droplets. Textures include ragged islands and paper-colour dry-brush holes. | Pass | Wall marks correctly depend on a real backing surface within the death ray; an open-space death only leaves floor history. |
+| Blood silhouette and scale | Floor coverage was reduced from an oversized carpet to a compact `2.18 × 1.52` world-unit primary pool. Wall and floor layers have independent scale, alpha, rotation, and four deterministic texture variants. | Pass | The exact projected size still varies with camera distance, as it does in the reference. |
+| NPC proportions | Regular-rig bounds remain at the architectural scale contract. The audited close variant has a belly/head width ratio of about `1.147`, matching the reference's approximately `1.14–1.20` range. | Pass | Class readability still uses subtle equipment and scale variation; it deliberately avoids unrelated silhouettes. |
+| NPC irregularity | Eight deterministic variants independently warp the head and belly, alter face strokes, offset the upright weapon, and vary arm, leg, mitten, and shoe length/angle. Collision radius and navigation scale are unchanged. | Pass | The two-mass snowman language remains recognisable by design; irregularity is bounded rather than noisy. |
+| Architectural ink | Long contours use a dark wobbled primary pass plus an intermittent displaced pale pass in one draw call. Surface-aware hatch families vary direction, spacing, pressure, continuity, and phase; dark soffits add a dense near-horizontal family. | Pass | Very distant geometry naturally compresses the secondary pass to sub-pixel contrast. |
+| Viewmodel ink | Rifle, hands, and other first-person parts use the same deterministic doubled-edge helper at a tighter subdivision scale. | Pass | Browser line width remains one physical WebGL line on platforms that ignore wide-line requests. |
+| Stability | All variation is seeded and static. The optimized fragment path removes transcendental periodic functions, halves hash usage, and reduces hand-drawn outline vertices by about 21% without adding draw calls. | Pass | The rear undercroft is the highest-fill view and therefore remains the most expensive angle. |
+| Runtime verification | TypeScript check, 67 automated tests, and production build pass. In the in-app browser, the normal six-actor view measured about 85 FPS; capture review measured about 93 FPS in the core view and 58 FPS in the high-fill rear view. | Pass | These are review-machine measurements, not a universal hardware guarantee. |
+
+Highest-impact future polish, if requested: add a few more authored blood-history layouts for repeated kills in the same corner, and vary the NPC's held-weapon pose by combat state without changing its source-matched silhouette.

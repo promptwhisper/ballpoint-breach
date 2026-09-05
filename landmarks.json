@@ -1,0 +1,15 @@
+{
+  "aspect": 2.0168067227,
+  "y": 1.72,
+  "search": {
+    "x": [-1.5, 1.5],
+    "z": [8.0, 12.0]
+  },
+  "landmarks": [
+    { "name": "tower_left", "x": -7.4, "z": -12.5, "frac": 0.22 },
+    { "name": "tower_right", "x": -0.6, "z": -12.5, "frac": 0.48 },
+    { "name": "block_left", "x": 0.9, "z": -10.5, "frac": 0.54 },
+    { "name": "block_right", "x": 6.0, "z": -11.5, "frac": 0.75 },
+    { "name": "right_wall", "x": 9.5, "z": -7.0, "frac": 0.97 }
+  ]
+}
