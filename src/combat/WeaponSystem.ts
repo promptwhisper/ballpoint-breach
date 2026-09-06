@@ -962,7 +962,8 @@ export class WeaponSystem {
     const trail = viewmodel.parts.trail;
     if (trail) {
       trail.visible = sample.trail > 0.04;
-      trail.scale.setScalar(0.86 + sample.trail * 0.18);
+      const trailScale = 0.86 + sample.trail * 0.18;
+      trail.scale.set(this.katanaSlashVariant === 'reverse' ? -trailScale : trailScale, trailScale, trailScale);
       trail.rotation.z = -0.08 * sample.trail;
     }
   }

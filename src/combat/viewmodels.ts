@@ -70,16 +70,10 @@ const softOutlineMaterial = new THREE.LineBasicMaterial({
 const katanaTrailMaterial = new THREE.MeshBasicMaterial({
   color: PALETTE.blueInk,
   transparent: true,
-  opacity: 0.34,
+  opacity: 0.88,
   depthTest: false,
   depthWrite: false,
-});
-const katanaTrailGhostMaterial = new THREE.MeshBasicMaterial({
-  color: PALETTE.redInk,
-  transparent: true,
-  opacity: 0.16,
-  depthTest: false,
-  depthWrite: false,
+  side: THREE.DoubleSide,
 });
 
 const materials: Readonly<Record<PartMaterial, THREE.Material>> = Object.freeze({
@@ -631,34 +625,30 @@ function createKatanaViewmodel(): WeaponViewmodel {
   const muzzle = addMuzzle(assembly, [0, 0.04, -2.72]);
 
   const trail = new THREE.Group();
-  trail.name = 'katana-handdrawn-sweep';
+  trail.name = 'katana-reference-dash-arc';
   trail.visible = false;
   root.add(trail);
-  const sweepPoints = [
-    new THREE.Vector3(0.08, 0.47, -0.74),
-    new THREE.Vector3(-0.19, 0.4, -0.77),
-    new THREE.Vector3(-0.43, 0.25, -0.83),
-    new THREE.Vector3(-0.61, 0.04, -0.9),
-    new THREE.Vector3(-0.7, -0.2, -0.98),
-    new THREE.Vector3(-0.67, -0.45, -1.06),
-  ];
-  const sweepCurve = new THREE.CatmullRomCurve3(sweepPoints, false, 'centripetal');
-  const sweep = new THREE.Mesh(new THREE.TubeGeometry(sweepCurve, 36, 0.012, 4, false), katanaTrailMaterial);
-  sweep.name = 'katana-sweep-main-stroke';
-  sweep.renderOrder = 35;
-  sweep.frustumCulled = false;
-  trail.add(sweep);
-
-  const ghostCurve = new THREE.CatmullRomCurve3(
-    sweepPoints.map((point, index) => point.clone().add(new THREE.Vector3(0.015 + index * 0.002, -0.018, 0.012))),
-    false,
-    'centripetal',
-  );
-  const ghost = new THREE.Mesh(new THREE.TubeGeometry(ghostCurve, 36, 0.006, 4, false), katanaTrailGhostMaterial);
-  ghost.name = 'katana-sweep-ghost-stroke';
-  ghost.renderOrder = 34;
-  ghost.frustumCulled = false;
-  trail.add(ghost);
+  const dashGeometry = new THREE.PlaneGeometry(1, 1);
+  const dashArc = [
+    [0.04, 0.36, -0.98, -0.24, 0.16],
+    [-0.12, 0.31, -0.99, -0.36, 0.19],
+    [-0.27, 0.23, -1.0, -0.5, 0.21],
+    [-0.4, 0.11, -1.01, -0.66, 0.22],
+    [-0.49, -0.03, -1.02, -0.81, 0.21],
+    [-0.54, -0.18, -1.03, -0.98, 0.19],
+    [-0.55, -0.32, -1.04, -1.12, 0.16],
+  ] as const;
+  for (let index = 0; index < dashArc.length; index += 1) {
+    const [x, y, z, rotationZ, length] = dashArc[index];
+    const dash = new THREE.Mesh(dashGeometry, katanaTrailMaterial);
+    dash.name = `katana-reference-dash-${index + 1}`;
+    dash.position.set(x, y, z);
+    dash.rotation.z = rotationZ;
+    dash.scale.set(length, 0.028 + (index % 2) * 0.004, 1);
+    dash.renderOrder = 35;
+    dash.frustumCulled = false;
+    trail.add(dash);
+  }
   return {
     id: 'katana',
     root,
