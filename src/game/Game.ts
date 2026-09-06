@@ -47,6 +47,7 @@ export interface GameOptions {
   fireDemo?: boolean;
   inkDemo?: boolean;
   showcase?: boolean;
+  demoReel?: boolean;
   katanaReviewProgress?: number;
   katanaReviewVariant?: KatanaSlashVariant;
   renderSize?: Readonly<{ width: number; height: number }>;
@@ -129,6 +130,7 @@ export class Game {
   private readonly qaFireDemo: boolean;
   private readonly qaInkDemo: boolean;
   private readonly showcaseMode: boolean;
+  private readonly demoReelMode: boolean;
   private readonly katanaReviewProgress?: number;
   private readonly katanaReviewVariant: KatanaSlashVariant;
   private readonly renderSize?: Readonly<{ width: number; height: number }>;
@@ -149,6 +151,9 @@ export class Game {
   private qaInkDemoConsumed = false;
   private showcaseTimer = 0;
   private showcaseSlashIndex = 0;
+  private demoReelTimer = 0;
+  private demoReelSegment = -1;
+  private demoSpawnSerial = 0;
   private controlRequest = 0;
   private wasPointerLocked = false;
   private deathFlashTimeout: number | null = null;
@@ -163,6 +168,7 @@ export class Game {
     this.qaFireDemo = options.fireDemo ?? false;
     this.qaInkDemo = options.inkDemo ?? false;
     this.showcaseMode = options.showcase ?? false;
+    this.demoReelMode = options.demoReel ?? false;
     this.katanaReviewProgress = options.katanaReviewProgress;
     this.katanaReviewVariant = options.katanaReviewVariant ?? 'forward';
     this.renderSize = options.renderSize;
@@ -272,6 +278,7 @@ export class Game {
       if (this.reviewView) this.applyReviewView(this.reviewView);
       if (this.stressMode) this.populateStressScene();
       if (this.showcaseMode) this.populateShowcaseScene();
+      if (this.demoReelMode) this.populateDemoReelScene();
       if (this.katanaReviewProgress !== undefined) {
         this.weapons.reset('katana');
         this.weapons.setKatanaReviewProgress(this.katanaReviewProgress);
@@ -416,6 +423,9 @@ export class Game {
     this.inkDemoTimer = 0;
     this.showcaseTimer = 0;
     this.showcaseSlashIndex = 0;
+    this.demoReelTimer = 0;
+    this.demoReelSegment = -1;
+    this.demoSpawnSerial = 0;
     this.qaInkDemoConsumed = false;
     this.qaDamageDemoConsumed = false;
     this.roundStarted = true;
@@ -451,9 +461,10 @@ export class Game {
   };
 
   private updatePlaying(realDelta: number): void {
-    const input = this.input.consumeFrame();
+    let input = this.input.consumeFrame();
+    if (this.demoReelMode) input = this.updateDemoReel(realDelta, input);
     const controlActive = input.controlsActive || this.capturePlayback;
-    this.player.enabled = controlActive && !this.capturePlayback;
+    this.player.enabled = controlActive && (!this.capturePlayback || this.demoReelMode);
     this.weapons.setEnabled(controlActive);
     if (input.pausePressed && !this.capturePlayback) {
       this.controlRequest += 1;
@@ -643,6 +654,7 @@ export class Game {
   private handleMelee(request: MeleeRequest): void {
     const threshold = Math.cos(request.arcRadians * 0.5);
     let hit = false;
+    let bloodGain = 0;
     for (const enemy of this.enemies.getLivingEnemies()) {
       const target = enemy.position.clone().add(new THREE.Vector3(0, enemy.kind === 'boss' ? 1.7 : 1.05, 0));
       const delta = target.sub(request.origin);
@@ -659,8 +671,12 @@ export class Game {
         sourceId: 'player-katana',
       });
       hit ||= Boolean(result);
+      if (result) bloodGain += result.killed ? 2 : 1;
     }
-    if (hit) this.hud.flashHit(false);
+    if (hit) {
+      this.weapons.addKatanaBlood(bloodGain);
+      this.hud.flashHit(false);
+    }
     this.raycaster.set(request.origin, request.direction);
     this.raycaster.far = request.range;
     const worldHit = this.queries.firstWorldHit(this.raycaster, request.range);
@@ -899,6 +915,102 @@ export class Game {
     this.enemies.spawn('grunt', new THREE.Vector3(player.x, 0, player.z - 4.02), { id: 'showcase-front', yaw: 0 });
     this.enemies.spawn('grunt', new THREE.Vector3(player.x - 1.65, 0, player.z - 5.25), { id: 'showcase-left', yaw: 0 });
     this.enemies.spawn('marksman', new THREE.Vector3(player.x + 1.75, 0, player.z - 5.7), { id: 'showcase-right', yaw: 0 });
+  }
+
+  private populateDemoReelScene(): void {
+    this.enemies.reset();
+    this.weapons.reset('rifle');
+    this.demoReelTimer = 0;
+    this.demoReelSegment = -1;
+    this.demoSpawnSerial = 0;
+    this.player.yaw = 0;
+    this.player.pitch = -0.02;
+    this.player.teleport(this.arena.safePlayerSpawn);
+    this.spawnDemoTarget('grunt', 8, -1.5);
+    this.spawnDemoTarget('marksman', 13, 2.4);
+    this.spawnDemoTarget('rusher', 17, -4.2);
+  }
+
+  private spawnDemoTarget(kind: EnemyKind, distance: number, lateral: number): void {
+    const player = this.player.body.position;
+    const forward = new THREE.Vector3(-Math.sin(this.player.yaw), 0, -Math.cos(this.player.yaw));
+    const right = new THREE.Vector3(Math.cos(this.player.yaw), 0, -Math.sin(this.player.yaw));
+    const position = player.clone().addScaledVector(forward, distance).addScaledVector(right, lateral);
+    position.y = 0;
+    this.demoSpawnSerial += 1;
+    this.enemies.spawn(kind, position, { id: `demo-${this.demoSpawnSerial}` });
+  }
+
+  private updateDemoReel(delta: number, base: InputFrame): InputFrame {
+    this.demoReelTimer += delta;
+    const t = this.demoReelTimer;
+    const boundaries = [0, 18, 34, 48, 62, 75];
+    let segment = 0;
+    while (segment + 1 < boundaries.length && t >= boundaries[segment + 1]) segment += 1;
+    if (segment !== this.demoReelSegment) {
+      this.demoReelSegment = segment;
+      const weapons: readonly WeaponId[] = ['rifle', 'shotgun', 'revolver', 'sniper', 'katana', 'rifle'];
+      this.weapons.selectWeapon(weapons[segment]);
+      const positions = [
+        this.arena.safePlayerSpawn,
+        new THREE.Vector3(-14, 0.25, 5),
+        new THREE.Vector3(14, 0.25, -7),
+        new THREE.Vector3(-32, 0.32, 20),
+        new THREE.Vector3(0, 0.32, -40.65),
+        new THREE.Vector3(-24, 0.25, -28),
+      ];
+      this.player.teleport(positions[segment]);
+      const kind: EnemyKind = segment === 5 ? 'boss' : segment === 1 ? 'heavy' : segment === 3 ? 'marksman' : 'grunt';
+      const count = segment === 4 ? 4 : segment === 5 ? 1 : 3;
+      for (let index = 0; index < count; index += 1) this.spawnDemoTarget(kind, segment === 4 ? 3.4 + index * 0.8 : 8 + index * 3, (index - 1) * 2.1);
+      if (segment === 1 || segment === 3) {
+        this.handlePlayerDamage({
+          amount: 18,
+          sourceEnemyId: 'demo-director',
+          sourceKind: 'marksman',
+          attack: 'projectile',
+          origin: this.player.body.position.clone().add(new THREE.Vector3(4, 1, -5)),
+          direction: new THREE.Vector3(-0.7, 0, 0.7),
+          projectileId: `demo-hit-${segment}`,
+        });
+      }
+    }
+
+    if (this.enemies.livingCount < (segment === 4 ? 2 : 3) && t < 86) {
+      const kind: EnemyKind = segment === 4 ? (this.demoSpawnSerial % 2 ? 'rusher' : 'grunt') : segment === 5 ? 'heavy' : segment === 1 ? 'heavy' : 'grunt';
+      this.spawnDemoTarget(kind, segment === 4 ? 3.5 : 8 + (this.demoSpawnSerial % 3) * 2.4, ((this.demoSpawnSerial % 3) - 1) * 2.2);
+    }
+
+    const player = this.player.body.position;
+    const target = [...this.enemies.getLivingEnemies()]
+      .sort((a, b) => a.position.distanceToSquared(player) - b.position.distanceToSquared(player))[0];
+    if (target) {
+      const targetPoint = target.position.clone().add(new THREE.Vector3(0, target.kind === 'boss' ? 1.8 : 1.05, 0));
+      const deltaAim = targetPoint.sub(this.camera.position);
+      const desiredYaw = Math.atan2(-deltaAim.x, -deltaAim.z);
+      const desiredPitch = THREE.MathUtils.clamp(-Math.atan2(deltaAim.y, Math.hypot(deltaAim.x, deltaAim.z)), -0.42, 0.34);
+      const turn = 1 - Math.exp(-4.6 * delta);
+      this.player.yaw += Math.atan2(Math.sin(desiredYaw - this.player.yaw), Math.cos(desiredYaw - this.player.yaw)) * turn;
+      this.player.pitch = THREE.MathUtils.lerp(this.player.pitch, desiredPitch, turn);
+    }
+
+    const local = t - boundaries[segment];
+    const katana = segment === 4;
+    const triggerPeriod = katana ? 0.78 : segment === 1 ? 1.05 : segment === 2 ? 0.72 : segment === 3 ? 1.3 : 0.19;
+    const firing = t > 3 && (local % triggerPeriod) < (katana ? 0.09 : segment === 0 || segment === 5 ? 0.12 : 0.08);
+    const move = katana ? 0.16 : segment === 3 ? 0.08 : 0.32;
+    return {
+      ...base,
+      moveX: Math.sin(t * 0.72) * (katana ? 0.18 : 0.32),
+      moveZ: move,
+      sprint: segment === 0 && local < 6,
+      primary: firing,
+      secondary: (segment === 3 && local > 3 && local < 12) || (katana && local > 8 && local < 11),
+      controlsActive: true,
+      pointerLocked: false,
+      lookX: Math.sin(t * 1.7) * 0.35,
+      lookY: Math.cos(t * 1.3) * 0.18,
+    };
   }
 
   private applyReviewView(view: 'rear' | 'west'): void {

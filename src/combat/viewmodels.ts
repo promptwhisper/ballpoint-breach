@@ -29,6 +29,7 @@ export interface WeaponViewmodelParts {
   readonly cylinder?: THREE.Object3D;
   readonly hammer?: THREE.Object3D;
   readonly blade?: THREE.Object3D;
+  readonly blood?: THREE.Object3D;
   readonly action?: THREE.Object3D;
   readonly trail?: THREE.Object3D;
   readonly sight?: THREE.Object3D;
@@ -599,6 +600,32 @@ function createKatanaViewmodel(): WeaponViewmodel {
   addPart(bladeRoot, { name: 'katana-blue-spine', material: 'ink', size: [0.061, 0.016, 2.25], position: [0, 0.09, -1.42], outline: false });
   addPart(bladeRoot, { name: 'katana-red-cutting-edge', material: 'red', size: [0.063, 0.015, 2.18], position: [0, -0.041, -1.42], outline: false });
   addPart(bladeRoot, { name: 'katana-pencil-hatch', material: 'hatch', size: [0.061, 0.019, 1.92], position: [0, 0.024, -1.42], outline: false });
+  const bladeBlood = new THREE.Group();
+  bladeBlood.name = 'katana-blade-blood';
+  bladeRoot.add(bladeBlood);
+  const bloodMarks = [
+    [-0.58, 0.014, 0.13, 0.052, -0.18],
+    [-0.92, -0.012, 0.19, 0.044, 0.24],
+    [-1.28, 0.026, 0.15, 0.058, -0.34],
+    [-1.66, -0.005, 0.23, 0.046, 0.16],
+    [-2.06, 0.022, 0.17, 0.054, -0.27],
+  ] as const;
+  for (let index = 0; index < bloodMarks.length; index += 1) {
+    const [z, y, width, height, rotation] = bloodMarks[index];
+    const stain = new THREE.Group();
+    stain.name = `katana-blood-stain-${index + 1}`;
+    stain.visible = false;
+    for (const side of [-1, 1]) {
+      const mark = new THREE.Mesh(new THREE.CircleGeometry(0.5, 7), materials.red);
+      mark.name = `katana-blood-stain-${index + 1}-${side < 0 ? 'back' : 'front'}`;
+      mark.position.set(side * 0.032, y, z);
+      mark.rotation.set(0, side * Math.PI / 2, rotation * side);
+      mark.scale.set(width, height, 1);
+      mark.renderOrder = 24;
+      stain.add(mark);
+    }
+    bladeBlood.add(stain);
+  }
   const guard = addPart(assembly, { name: 'katana-diamond-guard', material: 'hatch', size: [0.29, 0.048, 0.28], position: [0, -0.005, -0.2], rotation: [0, Math.PI / 4, 0] });
   guard.rotation.y = Math.PI / 4;
   addWrappedGrip(assembly, [0, -0.02, 0.27], [Math.PI / 2, 0, 0], 0.69);
@@ -654,7 +681,7 @@ function createKatanaViewmodel(): WeaponViewmodel {
     root,
     hipPose: makePose([0.877, -1.056, -1.5], [0.758, 0.172, -0.035], 1),
     aimPose: makePose([0.25, -0.3, -1.08], [-0.12, -0.16, -0.48], 1),
-    parts: { muzzle, blade: bladeRoot, action: actionRoot, trail },
+    parts: { muzzle, blade: bladeRoot, blood: bladeBlood, action: actionRoot, trail },
   };
 }
 

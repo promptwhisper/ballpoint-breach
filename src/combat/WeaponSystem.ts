@@ -184,6 +184,7 @@ export class WeaponSystem {
   private katanaPendingAttackId: number | null = null;
   private katanaReviewProgress: number | null = null;
   private katanaSlashVariant: KatanaSlashVariant = 'forward';
+  private katanaBloodLevel = 0;
 
   private triggerHeld = false;
   private triggerPressed = false;
@@ -362,6 +363,7 @@ export class WeaponSystem {
     this.katanaPendingAttackId = null;
     this.katanaReviewProgress = null;
     this.katanaSlashVariant = 'forward';
+    this.katanaBloodLevel = 0;
     this.triggerHeld = false;
     this.triggerPressed = false;
     this.triggerArmed = true;
@@ -387,6 +389,7 @@ export class WeaponSystem {
       this.viewmodels[id].root.visible = id === initialWeapon;
       this.restoreAnimatedParts(this.viewmodels[id]);
     }
+    this.applyKatanaBlood();
     for (const vector of [
       this.recoilPosition,
       this.recoilPositionVelocity,
@@ -408,6 +411,16 @@ export class WeaponSystem {
   selectSlot(slot: WeaponSlot | number): boolean {
     const id = weaponIdForSlot(slot);
     return id ? this.selectWeapon(id) : false;
+  }
+
+  /** Adds persistent hit stains to the blade; a new round clears them. */
+  addKatanaBlood(amount = 1): void {
+    this.katanaBloodLevel = Math.min(5, this.katanaBloodLevel + Math.max(1, Math.round(amount)));
+    this.applyKatanaBlood();
+  }
+
+  getKatanaBloodLevel(): number {
+    return this.katanaBloodLevel;
   }
 
   selectWeapon(id: WeaponId): boolean {
@@ -885,6 +898,14 @@ export class WeaponSystem {
     const katanaProgress = this.activeWeapon === 'katana' ? this.katanaReviewProgress : null;
     if (this.phase === 'slashing' || katanaProgress !== null) this.animateSlash(viewmodel, katanaProgress ?? progress);
     if (this.phase === 'blocking') viewmodel.root.rotation.y -= Math.sin(this.time * 3.2) * 0.006;
+  }
+
+  private applyKatanaBlood(): void {
+    const blood = this.viewmodels.katana.parts.blood;
+    if (!blood) return;
+    blood.children.forEach((stain, index) => {
+      stain.visible = index < this.katanaBloodLevel;
+    });
   }
 
   private restoreAnimatedParts(viewmodel: WeaponViewmodel): void {

@@ -333,11 +333,15 @@ test('all procedural viewmodels expose host sockets and the rifle stays slim', (
   assert.ok(katana.getObjectByName('katana-off-hand'));
   assert.ok(katana.getObjectByName('katana-main-paper-sleeve'));
   assert.ok(katana.getObjectByName('katana-reference-dash-arc'));
+  assert.ok(katana.getObjectByName('katana-blade-blood'));
   assert.equal(katana.getObjectByName('katana-arc-dash-1'), undefined);
 });
 
 test('reset restores ammunition, rifle selection, stamina, FOV, viewmodels, and offsets', () => {
   const system = new WeaponSystem({ initialWeapon: 'katana', random: deterministicRandom });
+  system.addKatanaBlood(3);
+  assert.equal(system.getKatanaBloodLevel(), 3);
+  assert.equal(system.getViewmodel('katana').parts.blood?.children.filter((child) => child.visible).length, 3);
   system.setAimHeld(true);
   system.setLookDelta(90, -50);
   system.setMotion({ strafe: 1, forward: 1, speed: 8, grounded: true, sprinting: true });
@@ -355,6 +359,8 @@ test('reset restores ammunition, rifle selection, stamina, FOV, viewmodels, and 
   assert.equal(snapshot.katana.stamina, snapshot.katana.maxStamina);
   assert.equal(snapshot.ammo.rifle.magazine, 30);
   assert.equal(snapshot.ammo.rifle.reserve, 150);
+  assert.equal(system.getKatanaBloodLevel(), 0);
+  assert.equal(system.getViewmodel('katana').parts.blood?.children.some((child) => child.visible), false);
   assert.deepEqual(snapshot.offsets.position, [0, 0, 0]);
   assert.equal(system.getViewmodel('rifle').root.visible, true);
   assert.equal(system.getViewmodel('katana').root.visible, false);
