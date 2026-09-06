@@ -527,6 +527,8 @@ export class WeaponSystem {
     if (this.switchState) this.updateSwitch(deltaSeconds);
     else this.finishTimedPhaseIfNeeded();
 
+    this.tryAutoReload();
+
     this.updateBlocking(deltaSeconds);
     this.updateAim(deltaSeconds);
     if (this.enabled && !this.switchState) this.processTrigger();
@@ -584,6 +586,13 @@ export class WeaponSystem {
     runtime.nextFireAt = Math.max(runtime.nextFireAt, this.time);
     this.emitAmmoChanged(id);
     this.emitEffect('reload-complete', id);
+  }
+
+  private tryAutoReload(): void {
+    if (!this.enabled || this.switchState || this.phase !== 'idle' || this.activeWeapon === 'katana') return;
+    const runtime = this.runtimes[this.activeWeapon];
+    if (runtime.magazine !== 0 || runtime.reserve === null || runtime.reserve <= 0) return;
+    this.requestReload();
   }
 
   private updateBlocking(deltaSeconds: number): void {

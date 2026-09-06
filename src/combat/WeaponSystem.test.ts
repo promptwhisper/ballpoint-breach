@@ -59,6 +59,28 @@ test('reload transfers only the missing rounds after its full duration', () => {
   );
 });
 
+test('empty firearm automatically reloads when reserve ammunition remains', () => {
+  const effects: WeaponEffect[] = [];
+  const system = new WeaponSystem({
+    random: deterministicRandom,
+    callbacks: { onEffect: (effect) => effects.push(effect) },
+  });
+  system.setTrigger(true);
+  system.update(0);
+  system.update(2.76);
+  assert.equal(system.getSnapshot().ammo.rifle.magazine, 0);
+
+  system.update(0.06);
+  assert.equal(system.getSnapshot().phase, 'reloading');
+  assert.equal(effects.filter((effect) => effect.kind === 'reload-start').length, 1);
+
+  system.update(1.56);
+  const snapshot = system.getSnapshot();
+  assert.equal(snapshot.phase, 'idle');
+  assert.equal(snapshot.ammo.rifle.magazine, 30);
+  assert.equal(snapshot.ammo.rifle.reserve, 120);
+});
+
 test('shotgun emits a pellet batch and pump state guards repeat attacks', () => {
   const volleys: PelletsRequest[] = [];
   const system = new WeaponSystem({
