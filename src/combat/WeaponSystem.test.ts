@@ -332,6 +332,9 @@ test('all procedural viewmodels expose host sockets and the rifle stays slim', (
   assert.ok(katana.getObjectByName('katana-main-hand'));
   assert.ok(katana.getObjectByName('katana-off-hand'));
   assert.ok(katana.getObjectByName('katana-main-paper-sleeve'));
+  assert.ok(katana.getObjectByName('katana-tapered-blade'));
+  assert.equal(katana.getObjectByName('katana-red-cutting-edge'), undefined);
+  assert.equal(katana.getObjectByName('katana-pencil-hatch'), undefined);
   assert.ok(katana.getObjectByName('katana-reference-dash-arc'));
   assert.ok(katana.getObjectByName('katana-blade-blood'));
   assert.equal(katana.getObjectByName('katana-arc-dash-1'), undefined);

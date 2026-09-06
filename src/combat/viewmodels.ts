@@ -597,9 +597,6 @@ function createKatanaViewmodel(): WeaponViewmodel {
     [-2.55, -0.035],
   ], 0.055);
   addPart(bladeRoot, { name: 'katana-tapered-blade', geometry: bladeGeometry, material: 'paper', position: [0, 0, 0] });
-  addPart(bladeRoot, { name: 'katana-blue-spine', material: 'ink', size: [0.061, 0.016, 2.25], position: [0, 0.09, -1.42], outline: false });
-  addPart(bladeRoot, { name: 'katana-red-cutting-edge', material: 'red', size: [0.063, 0.015, 2.18], position: [0, -0.041, -1.42], outline: false });
-  addPart(bladeRoot, { name: 'katana-pencil-hatch', material: 'hatch', size: [0.061, 0.019, 1.92], position: [0, 0.024, -1.42], outline: false });
   const bladeBlood = new THREE.Group();
   bladeBlood.name = 'katana-blade-blood';
   bladeRoot.add(bladeBlood);
