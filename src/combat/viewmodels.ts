@@ -67,6 +67,20 @@ const softOutlineMaterial = new THREE.LineBasicMaterial({
   depthWrite: false,
   vertexColors: true,
 });
+const katanaTrailMaterial = new THREE.MeshBasicMaterial({
+  color: PALETTE.blueInk,
+  transparent: true,
+  opacity: 0.34,
+  depthTest: false,
+  depthWrite: false,
+});
+const katanaTrailGhostMaterial = new THREE.MeshBasicMaterial({
+  color: PALETTE.redInk,
+  transparent: true,
+  opacity: 0.16,
+  depthTest: false,
+  depthWrite: false,
+});
 
 const materials: Readonly<Record<PartMaterial, THREE.Material>> = Object.freeze({
   paper: new DoodleMaterial({ surfaceColor: PALETTE.paper, hatchScale: 7.2, hatchStrength: 0.46, seed: 11.2 }),
@@ -617,29 +631,34 @@ function createKatanaViewmodel(): WeaponViewmodel {
   const muzzle = addMuzzle(assembly, [0, 0.04, -2.72]);
 
   const trail = new THREE.Group();
-  trail.name = 'katana-broken-blue-ink-arc';
+  trail.name = 'katana-handdrawn-sweep';
   trail.visible = false;
   root.add(trail);
-  const trailDashes = [
-    [-0.02, 0.42, -0.72, -0.28, 0.25],
-    [-0.23, 0.34, -0.76, -0.43, 0.29],
-    [-0.43, 0.21, -0.82, -0.59, 0.33],
-    [-0.58, 0.04, -0.88, -0.75, 0.34],
-    [-0.68, -0.15, -0.94, -0.91, 0.32],
-    [-0.7, -0.34, -1.0, -1.07, 0.28],
-    [-0.65, -0.51, -1.06, -1.18, 0.23],
-  ] as const;
-  for (let index = 0; index < trailDashes.length; index += 1) {
-    const [x, y, z, rotationZ, length] = trailDashes[index];
-    addPart(trail, {
-      name: `katana-arc-dash-${index + 1}`,
-      material: 'ink',
-      size: [length, 0.055, 0.04],
-      position: [x, y, z],
-      rotation: [0, 0, rotationZ],
-      outline: false,
-    });
-  }
+  const sweepPoints = [
+    new THREE.Vector3(0.08, 0.47, -0.74),
+    new THREE.Vector3(-0.19, 0.4, -0.77),
+    new THREE.Vector3(-0.43, 0.25, -0.83),
+    new THREE.Vector3(-0.61, 0.04, -0.9),
+    new THREE.Vector3(-0.7, -0.2, -0.98),
+    new THREE.Vector3(-0.67, -0.45, -1.06),
+  ];
+  const sweepCurve = new THREE.CatmullRomCurve3(sweepPoints, false, 'centripetal');
+  const sweep = new THREE.Mesh(new THREE.TubeGeometry(sweepCurve, 36, 0.012, 4, false), katanaTrailMaterial);
+  sweep.name = 'katana-sweep-main-stroke';
+  sweep.renderOrder = 35;
+  sweep.frustumCulled = false;
+  trail.add(sweep);
+
+  const ghostCurve = new THREE.CatmullRomCurve3(
+    sweepPoints.map((point, index) => point.clone().add(new THREE.Vector3(0.015 + index * 0.002, -0.018, 0.012))),
+    false,
+    'centripetal',
+  );
+  const ghost = new THREE.Mesh(new THREE.TubeGeometry(ghostCurve, 36, 0.006, 4, false), katanaTrailGhostMaterial);
+  ghost.name = 'katana-sweep-ghost-stroke';
+  ghost.renderOrder = 34;
+  ghost.frustumCulled = false;
+  trail.add(ghost);
   return {
     id: 'katana',
     root,

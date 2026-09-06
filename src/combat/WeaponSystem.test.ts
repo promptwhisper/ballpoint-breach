@@ -332,7 +332,8 @@ test('all procedural viewmodels expose host sockets and the rifle stays slim', (
   assert.ok(katana.getObjectByName('katana-main-hand'));
   assert.ok(katana.getObjectByName('katana-off-hand'));
   assert.ok(katana.getObjectByName('katana-main-paper-sleeve'));
-  assert.ok(katana.getObjectByName('katana-broken-blue-ink-arc'));
+  assert.ok(katana.getObjectByName('katana-handdrawn-sweep'));
+  assert.equal(katana.getObjectByName('katana-arc-dash-1'), undefined);
 });
 
 test('reset restores ammunition, rifle selection, stamina, FOV, viewmodels, and offsets', () => {
