@@ -118,11 +118,11 @@ export class Hud {
     } else if (mode === 'start') {
       this.overlayTitle.textContent = 'BALLPOINT BREACH';
       this.overlayCopy.textContent = 'survive five waves in a construction-yard sketchbook';
-      this.startButton.textContent = 'CLICK TO ENTER THE PAGE';
+      this.startButton.textContent = 'CLICK / TAP TO ENTER THE PAGE';
       this.startButton.disabled = false;
     } else if (mode === 'paused') {
       this.overlayTitle.textContent = 'PAUSED';
-      this.overlayCopy.textContent = 'click the page to resume · Esc releases the cursor';
+      this.overlayCopy.textContent = 'click or tap the page to resume';
     } else if (mode === 'defeat') {
       this.overlayTitle.textContent = 'ERASED';
       this.overlayCopy.textContent = 'the page got the better of you';

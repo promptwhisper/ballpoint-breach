@@ -1,47 +1,149 @@
-export type GameSound = 'rifle' | 'shotgun' | 'revolver' | 'sniper' | 'katana' | 'hit' | 'headshot' | 'reload' | 'grapple' | 'hurt' | 'wave' | 'boss';
+import { AUDIO_CUES, type GameSound } from './clips';
+export type { GameSound } from './clips';
 
+export type AudioStatus = 'locked' | 'ready' | 'blocked' | 'muted' | 'unsupported';
+interface Voice {
+  media: HTMLAudioElement;
+  unlocked: boolean;
+  pending: boolean;
+  serial: number;
+  started: number;
+  source: string;
+  timer: ReturnType<typeof setTimeout> | null;
+}
+
+/** Local sampled audio only. Reuse unlocked media elements in restricted WebViews. */
 export class AudioSystem {
-  private context: AudioContext | null = null;
-  private master: GainNode | null = null;
+  private readonly voices: Voice[] = [];
+  private enabled = true;
+  private activated = false;
+  private disposed = false;
+  private serial = 0;
+  private status: AudioStatus = 'locked';
+  onStatus: ((status: AudioStatus) => void) | null = null;
 
+  constructor(private readonly createMedia: () => HTMLAudioElement = () => new Audio()) {}
+
+  getStatus(): AudioStatus { return this.status; }
+
+  /** Call synchronously inside a click/touch/key gesture, not the RAF loop. */
   resume(): void {
-    if (!this.context) {
-      this.context = new AudioContext();
-      this.master = this.context.createGain();
-      this.master.gain.value = 0.12;
-      this.master.connect(this.context.destination);
+    if (!this.enabled || this.disposed) return;
+    this.activated = true;
+    if (!this.voices.length) {
+      for (let i = 0; i < 6; i += 1) {
+        const media = this.createMedia();
+        media.preload = 'auto';
+        media.src = './audio/unlock.mp3';
+        media.setAttribute('playsinline', '');
+        media.setAttribute('webkit-playsinline', '');
+        this.voices.push({ media, unlocked: false, pending: false, serial: 0, started: 0, source: 'unlock', timer: null });
+      }
     }
-    if (this.context.state === 'suspended') void this.context.resume();
+    for (const voice of this.voices) {
+      if (voice.unlocked || voice.pending) continue;
+      // A short local silent file, NOT muted autoplay: each element needs
+      // permission for audible playback, even when effects are triggered in RAF.
+      this.startVoice(voice, 'unlock', 0.2, true);
+    }
+  }
+
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+    if (!enabled) {
+      this.suspend();
+      this.setStatus('muted');
+    } else {
+      this.setStatus('locked');
+      this.resume();
+    }
   }
 
   play(sound: GameSound): void {
-    if (!this.context || !this.master) return;
-    const now = this.context.currentTime;
-    const settings: Record<GameSound, [number, number, OscillatorType, number]> = {
-      rifle: [145, 62, 'square', 0.055],
-      shotgun: [92, 38, 'sawtooth', 0.16],
-      revolver: [118, 52, 'square', 0.11],
-      sniper: [78, 28, 'sawtooth', 0.22],
-      katana: [620, 190, 'sawtooth', 0.12],
-      hit: [760, 520, 'sine', 0.06],
-      headshot: [1160, 710, 'triangle', 0.11],
-      reload: [310, 240, 'square', 0.08],
-      grapple: [420, 105, 'sawtooth', 0.18],
-      hurt: [120, 68, 'sawtooth', 0.13],
-      wave: [330, 660, 'triangle', 0.32],
-      boss: [72, 42, 'sawtooth', 0.48],
+    if (!this.enabled || !this.activated || this.disposed || !this.voices.length) return;
+    const idle = this.voices.find((voice) => voice.source === sound && voice.unlocked && !voice.pending && voice.timer === null)
+      ?? this.voices.find((voice) => voice.unlocked && !voice.pending && voice.timer === null);
+    const voice = idle ?? this.voices.reduce((oldest, next) => next.started < oldest.started ? next : oldest);
+    const cue = AUDIO_CUES[sound];
+    this.startVoice(voice, sound, cue.duration, false);
+  }
+
+  suspend(): void {
+    this.activated = false;
+    for (const voice of this.voices) {
+      this.stopVoice(voice);
+      voice.unlocked = false;
+    }
+    if (this.enabled) this.setStatus('locked');
+  }
+
+  dispose(): void {
+    this.suspend();
+    this.disposed = true;
+    for (const voice of this.voices) {
+      voice.media.removeAttribute('src');
+      voice.media.load();
+    }
+    this.voices.length = 0;
+    this.onStatus = null;
+  }
+
+  private startVoice(voice: Voice, source: string, duration: number, prime: boolean): void {
+    this.stopVoice(voice);
+    const ticket = ++this.serial;
+    voice.serial = ticket;
+    voice.started = ticket;
+    voice.pending = true;
+    const current = (): boolean => !this.disposed && voice.serial === ticket;
+    const fail = (): void => {
+      if (!current()) return;
+      this.stopVoice(voice);
+      voice.unlocked = false;
+      this.setStatus('blocked');
     };
-    const [from, to, type, duration] = settings[sound];
-    const oscillator = this.context.createOscillator();
-    const gain = this.context.createGain();
-    oscillator.type = type;
-    oscillator.frequency.setValueAtTime(from, now);
-    oscillator.frequency.exponentialRampToValueAtTime(Math.max(20, to), now + duration);
-    gain.gain.setValueAtTime(sound === 'boss' ? 0.7 : 0.36, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-    oscillator.connect(gain);
-    gain.connect(this.master);
-    oscillator.start(now);
-    oscillator.stop(now + duration + 0.01);
+    try {
+      voice.media.volume = Math.min(1, 0.7 * (prime ? 1 : AUDIO_CUES[source as GameSound]?.gain ?? 1));
+      voice.media.muted = false;
+      // Reuse the same unlocked element when switching sources. Independent
+      // files do not depend on HTTP Range or nonzero seeking in offline hosts.
+      if (voice.source !== source) {
+        voice.source = source;
+        voice.media.src = `./audio/${source}.mp3`;
+      } else if (voice.media.readyState > 0) voice.media.currentTime = 0;
+      const result = voice.media.play();
+      const started = (): void => {
+        if (!current()) return;
+        if (voice.timer !== null) clearTimeout(voice.timer);
+        voice.timer = null;
+        voice.pending = false;
+        voice.unlocked = true;
+        this.setStatus('ready');
+        if (prime) {
+          this.stopVoice(voice);
+          return;
+        }
+        voice.timer = setTimeout(() => {
+          if (current()) this.stopVoice(voice);
+        }, (duration + 0.15) * 1000);
+      };
+      // Older engines can return void. Rejected playback never breaks gameplay.
+      if (result && typeof result.then === 'function') void result.then(started).catch(fail);
+      else started();
+      if (voice.pending) voice.timer = setTimeout(fail, 2000);
+    } catch { fail(); }
+  }
+
+  private stopVoice(voice: Voice): void {
+    voice.serial = ++this.serial;
+    voice.pending = false;
+    if (voice.timer !== null) clearTimeout(voice.timer);
+    voice.timer = null;
+    voice.media.pause();
+  }
+
+  private setStatus(status: AudioStatus): void {
+    if (this.status === status) return;
+    this.status = status;
+    this.onStatus?.(status);
   }
 }

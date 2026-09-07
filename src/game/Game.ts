@@ -155,8 +155,13 @@ export class Game {
   private demoReelSegment = -1;
   private demoSpawnSerial = 0;
   private controlRequest = 0;
-  private wasPointerLocked = false;
   private deathFlashTimeout: number | null = null;
+  private contextLost = false;
+  private pageVisible = !document.hidden;
+  private lowFpsSeconds = 0;
+  private qualityScale = 1;
+  private footstepIndex = -1;
+  private audioWasGrounded = false;
 
   constructor(readonly canvas: HTMLCanvasElement, options: GameOptions = {}) {
     this.captureMode = options.capture ?? false;
@@ -180,7 +185,7 @@ export class Game {
       powerPreference: 'high-performance',
       preserveDrawingBuffer: this.captureMode,
     });
-    this.renderer.setPixelRatio(this.captureMode ? 1 : Math.min(window.devicePixelRatio, 1.75));
+    this.updatePixelRatio();
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.shadowMap.enabled = false;
@@ -313,10 +318,17 @@ export class Game {
     document.body.classList.remove('death-hit');
     this.hud.clearDamageFeedback();
     window.removeEventListener('resize', this.resize);
-    document.removeEventListener('pointerlockchange', this.handlePointerLockChange);
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    this.canvas.removeEventListener('webglcontextlost', this.handleContextLost);
+    this.canvas.removeEventListener('webglcontextrestored', this.handleContextRestored);
     this.hud.startButton.removeEventListener('click', this.handleStartClick);
     this.hud.restartButton.removeEventListener('click', this.handleRestartClick);
     this.overlay.removeEventListener('click', this.handleOverlayClick);
+    for (const event of ['mousedown', 'touchstart', 'touchend', 'keydown']) {
+      document.removeEventListener(event, this.handleAudioGesture, true);
+    }
+    document.querySelector('#sound-toggle')?.removeEventListener('click', this.handleSoundToggle);
+    this.audio.dispose();
     this.input.dispose();
     this.arena.dispose();
     this.renderer.dispose();
@@ -324,15 +336,50 @@ export class Game {
 
   private installEvents(): void {
     window.addEventListener('resize', this.resize);
-    document.addEventListener('pointerlockchange', this.handlePointerLockChange);
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    this.canvas.addEventListener('webglcontextlost', this.handleContextLost);
+    this.canvas.addEventListener('webglcontextrestored', this.handleContextRestored);
     this.hud.startButton.addEventListener('click', this.handleStartClick);
     this.hud.restartButton.addEventListener('click', this.handleRestartClick);
     this.overlay.addEventListener('click', this.handleOverlayClick);
+    for (const event of ['mousedown', 'touchstart', 'touchend', 'keydown']) {
+      document.addEventListener(event, this.handleAudioGesture, { capture: true, passive: true });
+    }
+    document.querySelector('#sound-toggle')?.addEventListener('click', this.handleSoundToggle);
+    this.audio.onStatus = this.updateSoundButton;
   }
 
+  private readonly handleAudioGesture = (event: Event): void => {
+    if (!event.isTrusted || this.state.mode !== 'playing' || document.hidden) return;
+    if (event.target instanceof Element && event.target.closest('#sound-toggle')) return;
+    this.audio.resume();
+  };
+
+  private readonly handleSoundToggle = (event: Event): void => {
+    event.stopPropagation();
+    const enable = this.audio.getStatus() !== 'ready';
+    this.audio.setEnabled(enable);
+    if (enable) this.audio.play('reload');
+  };
+
+  private readonly updateSoundButton = (status: string): void => {
+    const button = document.querySelector<HTMLButtonElement>('#sound-toggle');
+    if (!button) return;
+    button.textContent = status === 'unsupported' ? 'SOUND · N/A' : status === 'ready' ? 'SOUND · ON' : status === 'muted' ? 'SOUND · OFF' : status === 'blocked' ? 'SOUND · RETRY' : 'SOUND · TAP';
+    button.disabled = status === 'unsupported';
+    button.title = status === 'unsupported' ? 'Web Audio is unavailable in this container.' : status === 'blocked' ? 'Playback failed. Tap to retry and check device media volume.' : '';
+    button.setAttribute('aria-pressed', String(status === 'ready'));
+    button.setAttribute('aria-label', status === 'ready' ? 'Mute sound' : 'Enable or retry sound');
+    button.dataset.audioStatus = status;
+  };
+
   private readonly resize = (): void => {
-    const width = Math.max(1, this.renderSize?.width ?? window.innerWidth);
-    const height = Math.max(1, this.renderSize?.height ?? window.innerHeight);
+    const internallyRotated = !this.renderSize && window.innerHeight > window.innerWidth;
+    const viewportWidth = internallyRotated ? window.innerHeight : window.innerWidth;
+    const viewportHeight = internallyRotated ? window.innerWidth : window.innerHeight;
+    const width = Math.max(1, this.renderSize?.width ?? viewportWidth);
+    const height = Math.max(1, this.renderSize?.height ?? viewportHeight);
+    this.updatePixelRatio(width, height);
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
@@ -340,15 +387,15 @@ export class Game {
 
   private readonly handleStartClick = (event: MouseEvent): void => {
     event.stopPropagation();
-    this.audio.resume();
     if (!this.roundStarted) this.beginRound();
+    this.audio.resume();
     this.requestGameplayControl();
   };
 
   private readonly handleRestartClick = (event: MouseEvent): void => {
     event.stopPropagation();
-    this.audio.resume();
     this.beginRound();
+    this.audio.resume();
     if (this.captureMode) {
       this.capturePlayback = true;
       this.setMode('playing');
@@ -366,37 +413,12 @@ export class Game {
   };
 
   private requestGameplayControl(): void {
-    const request = ++this.controlRequest;
-    this.input.setPointerFallback(false);
-    void this.input.requestPointerLock().then((locked) => {
-      if (request !== this.controlRequest) return;
-      if (locked) {
-        this.wasPointerLocked = true;
-        this.input.setPointerFallback(false);
-        if (this.state.mode === 'start' || this.state.mode === 'paused') this.setMode('playing');
-        return;
-      }
-      if (this.state.mode !== 'start' && this.state.mode !== 'paused') return;
-      this.input.setPointerFallback(true);
-      this.capturePlayback = false;
-      this.setMode('playing');
-      this.hud.showTip('POINTER LOCK UNAVAILABLE · MOVE THE CURSOR TO LOOK · ESC PAUSES', 5.5);
-    });
+    this.controlRequest += 1;
+    this.input.setPointerFallback(true);
+    this.capturePlayback = false;
+    if (this.state.mode === 'start' || this.state.mode === 'paused') this.setMode('playing');
+    this.hud.showTip('TAP RIGHT TO FIRE · DRAG TO LOOK · HOLD FOR AUTO FIRE', 5.2);
   }
-
-  private readonly handlePointerLockChange = (): void => {
-    const locked = document.pointerLockElement === this.canvas;
-    const wasLocked = this.wasPointerLocked;
-    this.wasPointerLocked = locked;
-    if (locked) {
-      if ((this.state.mode === 'start' || this.state.mode === 'paused') && !this.roundStarted) this.beginRound();
-      this.input.setPointerFallback(false);
-      this.capturePlayback = false;
-      if (this.state.mode === 'start' || this.state.mode === 'paused') this.setMode('playing');
-    } else if (wasLocked && !locked && this.state.mode === 'playing' && !this.capturePlayback && !this.input.usingPointerFallback) {
-      this.setMode('paused');
-    }
-  };
 
   private beginRound(): void {
     this.state.reset();
@@ -435,6 +457,7 @@ export class Game {
   }
 
   private setMode(mode: GameMode): void {
+    if (this.state.mode === 'playing' && mode !== 'playing') this.audio.suspend();
     this.state.mode = mode;
     const active = mode === 'playing';
     this.input.setEnabled(active);
@@ -447,6 +470,7 @@ export class Game {
     const realDelta = Math.min(0.05, Math.max(0, (time - this.previousTime) / 1000));
     this.previousTime = time;
     this.smoothedFps = THREE.MathUtils.lerp(this.smoothedFps, realDelta > 0 ? 1 / realDelta : 60, 0.045);
+    this.updatePerformanceTier(realDelta);
     if (this.state.mode === 'playing') {
       this.updatePlaying(realDelta);
     } else {
@@ -457,7 +481,7 @@ export class Game {
     this.hud.update(realDelta);
     this.updateStage(time);
     this.renderFrame();
-    this.requestId = requestAnimationFrame(this.frame);
+    this.requestId = this.pageVisible && !this.contextLost ? requestAnimationFrame(this.frame) : 0;
   };
 
   private updatePlaying(realDelta: number): void {
@@ -469,7 +493,6 @@ export class Game {
     if (input.pausePressed && !this.capturePlayback) {
       this.controlRequest += 1;
       this.input.setPointerFallback(false);
-      if (document.pointerLockElement === this.canvas) void document.exitPointerLock();
       this.setMode('paused');
       return;
     }
@@ -514,6 +537,7 @@ export class Game {
     this.camera.getWorldDirection(this.aimDirection).normalize();
     this.aimUp.set(0, 1, 0).applyQuaternion(this.camera.quaternion).normalize();
     const playerSnapshot = this.player.getSnapshot();
+    this.updateMovementAudio(playerSnapshot);
     this.weapons.setAimRay(this.aimOrigin, this.aimDirection, this.aimUp);
     this.weapons.setLookDelta(input.lookX, input.lookY);
     this.weapons.setMotion({
@@ -607,7 +631,10 @@ export class Game {
       registeredHit ||= result.hit;
       headshot ||= result.headshot;
     }
-    if (registeredHit) this.hud.flashHit(headshot);
+    if (registeredHit) {
+      this.hud.flashHit(headshot);
+      this.audio.play(headshot ? 'headshot' : 'hit');
+    }
   }
 
   private resolveBallisticRay(
@@ -633,7 +660,10 @@ export class Game {
         impulse: knockback,
         sourceId: `player-${weaponId}`,
       });
-      if (result && flashHud) this.hud.flashHit(result.headshot);
+      if (result && flashHud) {
+        this.hud.flashHit(result.headshot);
+        this.audio.play(result.headshot ? 'headshot' : 'hit');
+      }
       return { hit: Boolean(result), headshot: result?.headshot ?? false };
     }
 
@@ -647,6 +677,7 @@ export class Game {
       } else {
         this.effects.spawnBurst(worldHit.point, 'blue', 0.13, 0.34);
       }
+      this.audio.play('worldImpact');
     }
     return { hit: false, headshot: false };
   }
@@ -676,6 +707,7 @@ export class Game {
     if (hit) {
       this.weapons.addKatanaBlood(bloodGain);
       this.hud.flashHit(false);
+      this.audio.play('meleeHit');
     }
     this.raycaster.set(request.origin, request.direction);
     this.raycaster.far = request.range;
@@ -716,8 +748,18 @@ export class Game {
       this.player.addRecoil(Math.min(1.35, (effect.strength ?? 0.5) * 0.58), Math.sin(effect.timestamp * 41.7) * 0.06);
     } else if (effect.kind === 'reload-start') {
       this.audio.play('reload');
+    } else if (effect.kind === 'dry-fire') {
+      this.audio.play('dryFire');
+    } else if (effect.kind === 'switch-start') {
+      this.audio.play('weaponSwitch');
+    } else if (effect.kind === 'pump') {
+      this.audio.play('pump');
+    } else if (effect.kind === 'bolt') {
+      this.audio.play('bolt');
     } else if (effect.kind === 'slash') {
       this.audio.play('katana');
+    } else if (effect.kind === 'block-start') {
+      this.audio.play('block');
     } else if (effect.kind === 'block-break') {
       this.audio.play('hurt');
       this.hud.showTip('BLOCK BROKEN', 1.1);
@@ -754,6 +796,7 @@ export class Game {
       const away = event.position.clone().sub(this.getPlayerCenter()).normalize();
       this.effects.spawnInkSplatter(event.position, away, 'red', event.headshot ? 8 : 5);
     } else if (event.type === 'death') {
+      this.audio.play(event.kind === 'boss' ? 'boss' : 'enemyDeath');
       const recent = this.lastHit.get(event.enemyId);
       const headshot = Boolean(recent?.headshot && performance.now() - recent.time < 2200);
       this.state.awardKill(scoreForEnemy(event.kind), {
@@ -799,11 +842,15 @@ export class Game {
       this.effects.spawnBurst(event.position, 'red', event.kind === 'boss' ? 0.55 : 0.22, event.telegraphDuration ?? 0.35);
     } else if (event.type === 'projectile-impact') {
       this.effects.spawnBurst(event.position, 'red', 0.13, 0.26);
+      this.audio.play('worldImpact');
+    } else if (event.type === 'projectile-spawn') {
+      this.audio.play('enemyFire');
     } else if (event.type === 'boss-phase') {
       this.hud.showBanner('THE DOODLER', 'PHASE TWO · THE LINES GET ANGRY', 2.1);
       this.audio.play('boss');
     } else if (event.type === 'boss-summon') {
       this.hud.showTip('THE DOODLER SKETCHED REINFORCEMENTS', 2.1);
+      this.audio.play('boss');
     } else if (event.type === 'cleanup') {
       this.lastHit.delete(event.enemyId);
     }
@@ -827,6 +874,7 @@ export class Game {
       this.audio.play(event.wave === 5 ? 'boss' : 'wave');
     } else if (event.type === 'wave-clear') {
       this.hud.showBanner('WAVE CLEARED', 'CATCH YOUR BREATH · RESTOCKING INK', 2.8);
+      this.audio.play('waveClear');
     } else if (event.type === 'victory') {
       this.finish('victory');
     }
@@ -850,7 +898,27 @@ export class Game {
       this.weapons.addReserveAmmo('sniper', Math.max(2, Math.round(event.ammo * 0.18)));
     }
     this.effects.spawnBurst(this.player.body.position.clone().add(new THREE.Vector3(0, 0.7, 0)), 'green', 0.34, 0.42);
+    this.audio.play('pickup');
     this.hud.showTip(event.kind === 'mixed' ? 'HEALTH + AMMO' : `${event.kind.toUpperCase()} REFILLED`, 1.25);
+  }
+
+  private updateMovementAudio(player: ReturnType<PlayerController['getSnapshot']>): void {
+    if (this.state.mode !== 'playing') {
+      this.footstepIndex = -1;
+      this.audioWasGrounded = player.grounded;
+      return;
+    }
+    if (!this.audioWasGrounded && player.grounded) this.audio.play('land');
+    this.audioWasGrounded = player.grounded;
+    if (!player.grounded || player.speed < 0.9 || player.gaitWeight < 0.08) {
+      this.footstepIndex = -1;
+      return;
+    }
+    const next = Math.floor(player.gaitPhase / Math.PI);
+    if (next !== this.footstepIndex) {
+      this.footstepIndex = next;
+      this.audio.play('footstep');
+    }
   }
 
   private finish(mode: 'defeat' | 'victory'): void {
@@ -863,7 +931,6 @@ export class Game {
     this.weapons.setAimHeld(false);
     this.enemies.projectilePool.clear();
     if (mode === 'victory') this.enemies.reset();
-    if (document.pointerLockElement === this.canvas) void document.exitPointerLock();
   }
 
   private populateStressScene(): void {
@@ -1057,6 +1124,61 @@ export class Game {
     const pushed = resolved.clone().set(playerPosition.x + separation.x, resolved.y, playerPosition.z + separation.z);
     return this.queries.resolveEnemyMovement(enemy, pushed);
   }
+
+  private updatePixelRatio(width = window.innerWidth, height = window.innerHeight): void {
+    if (this.captureMode) {
+      this.renderer.setPixelRatio(1);
+      return;
+    }
+    const pixelBudget = this.qualityScale < 1 ? 1_000_000 : 2_000_000;
+    const budgetRatio = Math.sqrt(pixelBudget / Math.max(1, width * height));
+    const ratio = Math.min(window.devicePixelRatio || 1, 1.5, budgetRatio) * this.qualityScale;
+    this.renderer.setPixelRatio(Math.max(0.5, ratio));
+  }
+
+  private updatePerformanceTier(delta: number): void {
+    if (this.captureMode || this.qualityScale < 1) return;
+    this.lowFpsSeconds = this.smoothedFps < 26
+      ? this.lowFpsSeconds + delta
+      : Math.max(0, this.lowFpsSeconds - delta * 0.5);
+    if (this.lowFpsSeconds < 3) return;
+    this.qualityScale = 0.75;
+    this.lowFpsSeconds = 0;
+    this.resize();
+    this.hud.showTip('LOW POWER MODE', 2);
+  }
+
+  private readonly handleVisibilityChange = (): void => {
+    this.pageVisible = !document.hidden;
+    if (!this.pageVisible) {
+      this.audio.suspend();
+      cancelAnimationFrame(this.requestId);
+      this.requestId = 0;
+      return;
+    }
+    this.previousTime = performance.now();
+    if (!this.contextLost && this.requestId === 0) this.requestId = requestAnimationFrame(this.frame);
+  };
+
+  private readonly handleContextLost = (event: Event): void => {
+    event.preventDefault();
+    this.contextLost = true;
+    this.audio.suspend();
+    cancelAnimationFrame(this.requestId);
+    this.requestId = 0;
+    const title = document.querySelector<HTMLElement>('#overlay-title');
+    const copy = document.querySelector<HTMLElement>('#overlay-copy');
+    if (title) title.textContent = 'GRAPHICS PAUSED';
+    if (copy) copy.textContent = 'The drawing surface was lost. Waiting to restore…';
+    this.overlay.classList.add('visible');
+  };
+
+  private readonly handleContextRestored = (): void => {
+    this.contextLost = false;
+    this.previousTime = performance.now();
+    this.overlay.classList.remove('visible');
+    if (this.pageVisible && this.requestId === 0) this.requestId = requestAnimationFrame(this.frame);
+  };
 
   private renderHud(): void {
     const weapon = this.weapons.getSnapshot();

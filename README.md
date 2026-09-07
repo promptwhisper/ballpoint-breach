@@ -80,6 +80,15 @@ Q fires a bounded blue line. Enemy hits pull the target toward the player; desig
 - `src/waves/` owns deterministic five-wave pacing.
 - `src/effects/`, `src/audio/`, and `src/ui/` provide bounded feedback systems.
 
+Audio uses downloaded samples, not synthesized effects. Normal web builds use
+local MP3 files; experimental mini-tool builds compile those samples into external
+JavaScript data and decode them with Web Audio, without shipping MP3 files. Click
+Start to unlock playback; the top-center SOUND button mutes or retries playback.
+Mini-tool builds retain optional iOS playback-session routing. Gameplay includes
+sampled movement, weapon handling, impacts, enemy, pickup and wave feedback.
+Both paths limit overlap to six voices. Source attribution, licenses, build
+instructions and client-validation limits are in [AUDIO_CREDITS.md](AUDIO_CREDITS.md).
+
 The host keeps simulation and visuals separate: weapons emit hitscan/melee requests, enemies emit attacks and lifecycle events, and `Game` resolves those requests against the shared arena queries.
 
 ## Notebook rendering

@@ -7,6 +7,8 @@ dist/
 coverage/
 .media2threejs/
 recordings/
+artifacts/
+gameblocks_usage.md
 .env
 .env.*
 !.env.example

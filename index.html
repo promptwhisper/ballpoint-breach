@@ -1,16 +1,18 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>BALLPOINT BREACH</title>
   </head>
   <body>
+    <main id="landscape-shell">
     <canvas id="app"></canvas>
     <div id="paper-lines" aria-hidden="true"></div>
     <div id="vignette" aria-hidden="true"></div>
 
     <section id="hud" aria-label="Game status">
+      <button id="sound-toggle" type="button" aria-label="Enable sound" aria-pressed="false">SOUND · TAP</button>
       <div class="hud-score">SCORE <strong data-hud="score">0</strong></div>
       <div class="hud-wave"><strong data-hud="wave">WAVE 1</strong><small data-hud="enemies">0 enemies left</small></div>
 
@@ -45,12 +47,24 @@
       <div id="scope-overlay"><div class="scope-reticle"><i></i><i></i></div></div>
     </section>
 
+    <section id="touch-controls" aria-label="Touch controls">
+      <div class="touch-move" data-touch-joystick role="button" aria-label="Movement joystick">
+        <i class="touch-stick" aria-hidden="true"></i>
+      </div>
+      <div class="touch-actions" aria-label="Actions">
+        <button class="action-grapple" type="button" data-touch-action="grapple" aria-label="Grapple"><span>⌁</span><small>HOOK</small></button>
+        <button class="action-jump" type="button" data-touch-action="jump" aria-label="Jump"><span>↥</span><small>JUMP</small></button>
+        <button class="action-weapon" type="button" data-touch-action="weapon" aria-label="Switch weapon"><span>↻</span><small>SWAP</small></button>
+        <button class="action-aim" type="button" data-touch-action="aim" aria-label="Aim down sights"><span>⌾</span><small>ADS</small></button>
+      </div>
+    </section>
+
     <section id="game-overlay" class="visible" data-mode="loading">
       <div class="overlay-card">
         <p class="eyebrow">A BALLPOINT-PEN ARENA FPS</p>
         <h1 id="overlay-title">BALLPOINT<br>BREACH</h1>
         <p id="overlay-copy">sharpening pencils…</p>
-        <button id="start-button" type="button" disabled>CLICK TO ENTER THE PAGE</button>
+        <button id="start-button" type="button" disabled>CLICK / TAP TO ENTER THE PAGE</button>
         <button id="restart-button" type="button" hidden>DRAW AGAIN</button>
         <div class="controls-grid">
           <span><b>WASD</b> MOVE</span><span><b>SHIFT</b> SPRINT</span><span><b>SPACE</b> JUMP</span>
@@ -61,6 +75,7 @@
     </section>
 
     <div id="stage" role="status">BUILD STAGE · PLAYABLE CORE</div>
-    <script type="module" src="/src/main.ts"></script>
+    </main>
+    <script type="module" src="./src/main.ts"></script>
   </body>
 </html>
