@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 
+function inkAsset(name: string): string {
+  return `${import.meta.env.BASE_URL}textures/ink/${name}`;
+}
+
 function fallbackTexture(value: number): THREE.DataTexture {
   const texture = new THREE.DataTexture(
     new Uint8Array([value, value, value, 255]),
@@ -24,8 +28,8 @@ function loadInkTexture(path: string, fallback: number): THREE.Texture {
   return texture;
 }
 
-export const inkBrushTexture = loadInkTexture('/textures/ink/ink-brush-field.webp', 128);
-export const xuanPaperTexture = loadInkTexture('/textures/ink/xuan-paper.webp', 245);
+export const inkBrushTexture = loadInkTexture(inkAsset('ink-brush-field.webp'), 128);
+export const xuanPaperTexture = loadInkTexture(inkAsset('xuan-paper.webp'), 245);
 
 const heroTextures = new Map<'weapon' | 'npc', THREE.Texture>();
 
@@ -34,7 +38,7 @@ export function getHeroInkTexture(role: 'weapon' | 'npc'): THREE.Texture {
   let texture = heroTextures.get(role);
   if (!texture) {
     const asset = role === 'weapon' ? 'weapon-dry-brush' : 'npc-wet-wash';
-    texture = loadInkTexture(`/textures/ink/${asset}-hero.webp`, 180);
+    texture = loadInkTexture(inkAsset(`${asset}-hero.webp`), 180);
     texture.name = `${role}-ink-scan`;
     heroTextures.set(role, texture);
   }
@@ -46,7 +50,7 @@ const atmosphereTextures = new Map<'ground' | 'sky', THREE.Texture>();
 export function getInkAtmosphereTexture(role: 'ground' | 'sky'): THREE.Texture {
   let texture = atmosphereTextures.get(role);
   if (!texture) {
-    texture = loadInkTexture(`/textures/ink/pale-${role}-v5.webp`, 238);
+    texture = loadInkTexture(inkAsset(`pale-${role}-v5.webp`), 238);
     texture.colorSpace = THREE.SRGBColorSpace;
     if (role === 'ground') {
       texture.repeat.set(6, 6.5);

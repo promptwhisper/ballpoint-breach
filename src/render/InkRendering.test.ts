@@ -8,8 +8,8 @@ import { CURRENT_INK_PALETTE } from './palette';
 import { resolveInkV4Stage, resolveInkVersion, inkUniforms, setInkParameter } from './inkSettings';
 
 test('ink versions preserve current and select incremental compile-time stages', () => {
-  assert.equal(resolveInkVersion(''), 'v2');
-  assert.equal(resolveInkVersion('?inkVersion=wrong'), 'v2');
+  assert.equal(resolveInkVersion(''), 'v5');
+  assert.equal(resolveInkVersion('?inkVersion=wrong'), 'v5');
   assert.equal(resolveInkV4Stage('?inkStage=a'), 'a');
   assert.equal(resolveInkV4Stage('?inkStage=b'), 'b');
   assert.equal(resolveInkV4Stage('?inkStage=wrong'), 'c');

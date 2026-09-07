@@ -2,15 +2,17 @@
 <html lang="zh-CN" data-style="ink">
   <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>破阵 · 水墨枪战</title>
   </head>
   <body>
+    <main id="landscape-shell">
     <canvas id="app"></canvas>
     <div id="paper-lines" aria-hidden="true"></div>
     <div id="vignette" aria-hidden="true"></div>
 
     <section id="hud" aria-label="战局状态">
+      <button id="sound-toggle" type="button" aria-label="开启声音" aria-pressed="false">声音 · 开启</button>
       <div class="hud-score"><span>战绩</span> <strong data-hud="score">0</strong></div>
       <div class="hud-wave"><strong data-hud="wave">第一阵</strong><small data-hud="enemies">余敌 0 人</small></div>
 
@@ -45,6 +47,18 @@
       <div id="scope-overlay"><div class="scope-reticle"><i></i><i></i></div></div>
     </section>
 
+    <section id="touch-controls" aria-label="触控操作">
+      <div class="touch-move" data-touch-joystick role="button" aria-label="移动摇杆">
+        <i class="touch-stick" aria-hidden="true"></i>
+      </div>
+      <div class="touch-actions" aria-label="操作按钮">
+        <button class="action-grapple" type="button" data-touch-action="grapple" aria-label="钩索"><span>⌁</span><small>钩索</small></button>
+        <button class="action-jump" type="button" data-touch-action="jump" aria-label="跳跃"><span>↥</span><small>跳跃</small></button>
+        <button class="action-weapon" type="button" data-touch-action="weapon" aria-label="切换武器"><span>↻</span><small>换枪</small></button>
+        <button class="action-aim" type="button" data-touch-action="aim" aria-label="瞄准"><span>⌾</span><small>瞄准</small></button>
+      </div>
+    </section>
+
     <section id="game-overlay" class="visible" data-mode="loading">
       <div class="overlay-card">
         <p class="eyebrow">水墨手绘 · 第一人称射击</p>
@@ -63,6 +77,7 @@
     </section>
 
     <div id="stage" role="status">正在准备墨境</div>
-    <script type="module" src="/src/main.ts"></script>
+    </main>
+    <script type="module" src="./src/main.ts"></script>
   </body>
 </html>

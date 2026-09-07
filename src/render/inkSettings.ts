@@ -3,8 +3,8 @@ export type InkV4Stage = 'a' | 'b' | 'c';
 
 export function resolveInkVersion(search: string): InkVersion {
   const version = new URLSearchParams(search).get('inkVersion');
-  return version === 'current' || version === 'v1' || version === 'v3' || version === 'v4' || version === 'v5'
-    ? version : 'v2';
+  return version === 'current' || version === 'v1' || version === 'v2' || version === 'v3' || version === 'v4' || version === 'v5'
+    ? version : 'v5';
 }
 
 export function resolveInkV4Stage(search: string): InkV4Stage {

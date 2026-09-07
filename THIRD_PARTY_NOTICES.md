@@ -33,3 +33,15 @@ the internal family name `BB WenKai UI`. The complete license is preserved at
 `licenses/fonts/LXGWWenKai-OFL-1.1.txt`.
 
 No upstream Git metadata, build cache, downloaded model, or upstream repository snapshot is included.
+
+## Sampled sound effects
+
+The local `public/audio/*.mp3` files include gun samples by Michel Baradari
+(apollo-music.de), licensed CC BY 3.0, plus CC0 foley by Jan Schupke / Vehicle and
+reload audio by Brian MacIntosh / BMacZero. These asset licenses are separate from
+the code license. See `AUDIO_CREDITS.md` for source links, exact file mappings,
+license links, and modifications. The offline package also includes
+`audio/credits.json` so attribution travels with the audio.
+
+Mini-tool builds include these same sample bytes as Base64 in `audio-data.js`
+instead of MP3 files. Encoding does not change asset ownership or licensing.

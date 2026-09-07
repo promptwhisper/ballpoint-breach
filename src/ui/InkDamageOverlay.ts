@@ -29,7 +29,7 @@ export class InkDamageOverlay {
       }
       return stamp;
     });
-    root.body.append(this.canvas);
+    (root.querySelector<HTMLElement>('#landscape-shell') ?? root.body).append(this.canvas);
   }
 
   hit(angle: number, amount: number): void {
@@ -63,8 +63,11 @@ export class InkDamageOverlay {
   update(dt: number): void {
     if (!this.context || !this.splashes.length) return;
     const context = this.context;
-    const width = this.root.defaultView?.innerWidth ?? 1280;
-    const height = this.root.defaultView?.innerHeight ?? 720;
+    const shell = this.root.querySelector<HTMLElement>('#landscape-shell');
+    const view = this.root.defaultView;
+    const rotated = (view?.innerHeight ?? 0) > (view?.innerWidth ?? 0);
+    const width = shell?.clientWidth || (rotated ? view?.innerHeight : view?.innerWidth) || 1280;
+    const height = shell?.clientHeight || (rotated ? view?.innerWidth : view?.innerHeight) || 720;
     const resolution = Math.min(1, 1280 / width);
     if (this.canvas.width !== Math.round(width * resolution) || this.canvas.height !== Math.round(height * resolution)) {
       this.canvas.width = Math.round(width * resolution); this.canvas.height = Math.round(height * resolution);

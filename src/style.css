@@ -25,11 +25,12 @@
   unicode-range:U+3000-303F,U+3400-9FFF,U+FF00-FFEF;
 }
 
-:root{font-family:'Patrick Hand','Chalkboard SE','Comic Sans MS',cursive;color:#27348f;background:#f6f0dc;font-synthesis:none;--font-ink-display:"BB Ink Display","STKaiti","Kaiti SC",serif;--font-ui:"BB WenKai UI","Kaiti SC",ui-serif,serif;--font-number:"Avenir Next Condensed","Arial Narrow",ui-sans-serif,system-ui,sans-serif;--font-title-en:"Avenir Next Condensed","Arial Narrow",ui-sans-serif,system-ui,sans-serif;--ink:#27348f;--ink-dark:#18246f;--red:#d63b55;--orange:#e79a32;--green:#69b887;--paper:#f6f0dc;--reticle-spread:22px;--damage-strength:.4}
+:root{font-family:'Patrick Hand','Chalkboard SE','Comic Sans MS',cursive;color:#27348f;background:#f6f0dc;font-synthesis:none;touch-action:manipulation;--font-ink-display:"BB Ink Display","STKaiti","Kaiti SC",serif;--font-ui:"BB WenKai UI","Kaiti SC",ui-serif,serif;--font-number:"Avenir Next Condensed","Arial Narrow",ui-sans-serif,system-ui,sans-serif;--font-title-en:"Avenir Next Condensed","Arial Narrow",ui-sans-serif,system-ui,sans-serif;--ink:#27348f;--ink-dark:#18246f;--red:#d63b55;--orange:#e79a32;--green:#69b887;--paper:#f6f0dc;--reticle-spread:22px;--damage-strength:.4}
 *{box-sizing:border-box}
 html,body,#app{width:100%;height:100%;margin:0;display:block;overflow:hidden;background:var(--paper)}
-body{user-select:none}
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 button{font:inherit}
+#landscape-shell{position:fixed;top:0;left:0;width:100%;height:100%;overflow:hidden;background:var(--paper);transform-origin:center center}
 #app{position:fixed;inset:0;z-index:0;outline:none}
 #paper-lines,#vignette,#hud,#game-overlay{position:fixed;inset:0}
 #paper-lines,#vignette,#hud{pointer-events:none}
@@ -43,6 +44,9 @@ body.player-hit #vignette::before{animation:player-damage-wash 680ms cubic-bezie
 @keyframes player-damage-wash{0%{opacity:.7}7%,46%{opacity:1}100%{opacity:0}}
 @keyframes death-hit-stop{0%,78%{opacity:1}79%,100%{opacity:0}}
 #hud{z-index:12;color:var(--ink);font-weight:700;letter-spacing:.01em;text-shadow:.35px .35px rgba(39,52,143,.32)}
+#sound-toggle{position:absolute;top:8px;left:50%;transform:translateX(-50%);min-width:108px;min-height:44px;padding:4px 10px;border:1px solid rgba(39,52,143,.5);border-radius:8px;background:rgba(246,240,220,.88);color:var(--ink-dark);font-size:14px;pointer-events:auto;touch-action:manipulation}
+#sound-toggle:focus{outline:2px solid var(--red);outline-offset:2px}
+#sound-toggle:active{background:var(--paper)}
 .hud-score{position:absolute;top:2.5%;left:8.6%;font-size:clamp(15px,1.25vw,25px)}
 .hud-score strong{font-size:1.08em}
 .hud-wave{position:absolute;top:2.3%;right:4.5%;font-size:clamp(14px,1.15vw,23px);text-align:right;font-weight:800}
@@ -440,3 +444,90 @@ html[data-style="ink"] #boss-health strong { font-size:30px; }
   html[data-style="ink"] .overlay-card button { font-size:27px; }
   html[data-style="ink"] #context-tip { font-size:20px; }
 }
+/* Chrome 61 baseline and mini-tool touch layer. Modern declarations above remain enhancements. */
+#app,#paper-lines,#vignette,#hud,#game-overlay{top:0;right:0;bottom:0;left:0}
+#game-overlay{display:flex;align-items:center;justify-content:center}
+.overlay-card{width:86vw;max-width:650px}
+.overlay-card h1{font-size:86px}
+.overlay-card>p:not(.eyebrow){font-size:20px}
+.hud-score{font-size:20px}.hud-wave{font-size:18px}.hud-ammo strong{font-size:48px}
+#boss-health{width:35vw;max-width:440px}
+#scope-overlay{background:radial-gradient(circle at center,transparent 0,transparent 28%,rgba(24,36,111,.12) 29%,rgba(246,240,220,.96) 31%)}
+.scope-reticle{width:44vw;height:44vw;max-width:58vh;max-height:58vh}
+.hud-health>span{margin-right:.48em}
+.controls-grid{grid-gap:8px 18px}
+#touch-controls{display:none;position:fixed;top:0;right:0;bottom:0;left:0;z-index:25;pointer-events:none;padding:0;padding-bottom:var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))}
+#touch-controls button{width:54px;height:54px;border:2px solid rgba(39,52,143,.66);border-radius:50%;background:rgba(246,240,220,.68);color:var(--ink-dark);font-size:14px;font-weight:900;pointer-events:auto;-webkit-user-select:none;user-select:none;touch-action:none;box-shadow:2px 2px 0 rgba(39,52,143,.12)}
+#touch-controls button span,#touch-controls button small{display:block;pointer-events:none}#touch-controls button span{font-size:20px;line-height:18px}#touch-controls button small{font-size:9px;line-height:12px;letter-spacing:.02em}
+.touch-move{position:absolute;left:18px;left:calc(18px + var(--safe-area-inset-left,env(safe-area-inset-left,0px)));bottom:22px;width:132px;height:132px;border:3px solid rgba(39,52,143,.68);border-radius:50%;background:rgba(246,240,220,.32);box-shadow:inset 0 0 0 10px rgba(39,52,143,.045);pointer-events:auto;touch-action:none}
+.touch-move::before{content:"";position:absolute;left:50%;top:50%;width:76px;height:76px;margin-left:-38px;margin-top:-38px;border:1px dashed rgba(39,52,143,.28);border-radius:50%}
+.touch-move::after{content:"疾跑";position:absolute;left:50%;top:-20px;width:70px;margin-left:-35px;color:var(--ink);font-size:10px;font-weight:900;letter-spacing:.08em;text-align:center;opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s}.touch-move.sprinting::after{opacity:.78;transform:translateY(0)}
+.touch-stick{position:absolute;left:50%;top:50%;width:54px;height:54px;margin-left:-27px;margin-top:-27px;border:2px solid var(--ink);border-radius:50%;background:rgba(246,240,220,.88);box-shadow:3px 3px 0 rgba(39,52,143,.15);transform:translate(0,0)}
+.touch-stick::after{content:"";position:absolute;left:50%;top:50%;width:8px;height:8px;margin-left:-4px;margin-top:-4px;border-radius:50%;background:var(--red);opacity:.7}.touch-move.active .touch-stick{background:rgba(231,154,50,.78)}
+.touch-actions{position:absolute;right:22px;right:calc(22px + var(--safe-area-inset-right,env(safe-area-inset-right,0px)));bottom:20px;width:158px;height:176px;pointer-events:none}
+.touch-actions button{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0}.touch-actions .action-grapple{left:18px;top:17px;width:50px;height:50px;opacity:.78}.touch-actions .action-jump{right:0;top:0;width:62px;height:62px}.touch-actions .action-weapon{left:8px;bottom:6px;width:54px;height:54px;opacity:.82}.touch-actions .action-aim{right:0;bottom:0;width:68px;height:68px}.touch-actions .action-aim.active{border-color:rgba(166,31,63,.86);background:rgba(214,59,85,.76);color:var(--paper);box-shadow:4px 4px 0 rgba(39,52,143,.18)}
+@media (pointer:coarse), (max-width:900px){#touch-controls{display:block}.hud-health{bottom:22%}.hud-ammo{bottom:11%}.hud-weapons{bottom:13%}#stage{bottom:2px}.overlay-card h1{font-size:64px}.overlay-card>p:not(.eyebrow){font-size:16px}}
+@media(max-width:520px){.touch-move{transform:scale(.82);transform-origin:left bottom}.touch-actions{transform:scale(.82);transform-origin:right bottom}.hud-weapons{display:none}.hud-health{left:5%;bottom:24%}.hud-ammo{left:5%;bottom:13%}}
+
+@media (orientation:landscape) and (max-height:520px){
+  #game-overlay{padding:8px 0;padding-left:var(--safe-area-inset-left,env(safe-area-inset-left,0px));padding-right:var(--safe-area-inset-right,env(safe-area-inset-right,0px))}
+  .overlay-card{width:72%;max-width:720px;padding:14px 30px 13px}
+  .overlay-card h1{font-size:52px;line-height:.7;margin:8px 0 13px}
+  .overlay-card>p:not(.eyebrow){margin-bottom:11px;font-size:14px}.eyebrow{margin-bottom:3px;font-size:11px}
+  .overlay-card button{padding:8px 20px;font-size:17px}.controls-grid{display:none}
+  .touch-move{bottom:14px;transform:scale(.82);transform-origin:left bottom}
+  .touch-actions{bottom:14px;transform:scale(.78);transform-origin:right bottom}
+  .hud-score{left:4%;top:3%;font-size:16px}.hud-wave{right:3%;top:3%;font-size:15px}
+  .hud-ammo{left:150px;bottom:12px}.hud-ammo strong{font-size:34px}.ammo-ticks{display:none}
+  .hud-health{left:150px;bottom:58px;font-size:12px}.hud-health>i{min-width:92px;width:12vw}
+  .hud-weapons{right:150px;bottom:12px;min-width:130px;width:17vw}.hud-weapons ol{display:none}.hud-weapons>strong{font-size:24px}
+  .ability-meter{bottom:2%;transform:translateX(-50%) scale(.84)}#block-stamina{bottom:9%}
+  #context-tip{bottom:14%;font-size:12px}#wave-banner{top:12%}#wave-banner strong{font-size:44px}
+  #stage{display:none}
+}
+
+/* XHS keeps its H5 viewport portrait-only. Rotate the game inside that viewport. */
+@media (orientation:portrait){
+  #landscape-shell{left:50%;top:50%;width:100vh;height:100vw;transform:translate(-50%,-50%) rotate(90deg)}
+  #game-overlay{padding:8px 0}
+  .overlay-card{width:72%;max-width:720px;padding:14px 30px 13px}
+  .overlay-card h1{font-size:52px;line-height:.7;margin:8px 0 13px}
+  .overlay-card>p:not(.eyebrow){margin-bottom:11px;font-size:14px}.eyebrow{margin-bottom:3px;font-size:11px}
+  .overlay-card button{padding:8px 20px;font-size:17px}.controls-grid{display:none}
+  .touch-move{left:112px;bottom:18px;transform:scale(.86);transform-origin:left bottom}
+  .touch-actions{right:22px;bottom:18px;transform:scale(.82);transform-origin:right bottom}
+  .hud-score{left:118px;top:3%;font-size:16px}.hud-wave{right:3%;top:3%;font-size:15px}
+  .hud-ammo{left:250px;bottom:12px}.hud-ammo strong{font-size:34px}.ammo-ticks{display:none}
+  .hud-health{left:250px;bottom:58px;font-size:12px}.hud-health>i{min-width:92px;width:12vw}
+  .hud-weapons{display:block;right:270px;bottom:12px;min-width:130px;width:17vw}.hud-weapons ol,.hud-weapons>small{display:none}.hud-weapons>strong{font-size:24px}
+  .ability-meter{bottom:2%;transform:translateX(-50%) scale(.84)}#block-stamina{bottom:9%}
+  #context-tip{bottom:14%;font-size:12px}#wave-banner{top:12%}#wave-banner strong{font-size:44px}
+  #stage{display:none}
+}
+
+/* The mobile controls belong to the same paper-and-ink language as the V5 HUD. */
+html[data-style="ink"] #sound-toggle{
+  top:14px;min-width:126px;border:1px solid rgba(42,44,42,.42);border-radius:2px;
+  background:rgba(239,238,231,.82);color:#2a2c2a;box-shadow:2px 3px 0 rgba(42,44,42,.1);
+  font-family:var(--font-ink-display);font-size:16px;font-weight:400;letter-spacing:.08em;
+}
+html[data-style="ink"] #touch-controls button{
+  border:1.5px solid rgba(42,44,42,.58);background:rgba(239,238,231,.58);color:#2a2c2a;
+  box-shadow:2px 3px 0 rgba(42,44,42,.1);font-family:var(--font-ink-display);font-weight:400;
+}
+html[data-style="ink"] #touch-controls button small{font-size:11px;letter-spacing:.08em}
+html[data-style="ink"] .touch-move{
+  border:2px solid rgba(42,44,42,.5);background:rgba(239,238,231,.22);
+  box-shadow:inset 0 0 0 9px rgba(42,44,42,.035);
+}
+html[data-style="ink"] .touch-move::before{border-color:rgba(42,44,42,.23)}
+html[data-style="ink"] .touch-stick{
+  border:1.5px solid rgba(42,44,42,.68);background:rgba(239,238,231,.72);
+  box-shadow:3px 3px 0 rgba(42,44,42,.1);
+}
+html[data-style="ink"] .touch-move.active .touch-stick{background:rgba(159,59,50,.22)}
+html[data-style="ink"] .touch-actions .action-aim.active{
+  border-color:rgba(159,59,50,.82);background:rgba(159,59,50,.7);color:#efeee7;
+  box-shadow:3px 3px 0 rgba(42,44,42,.14);
+}
+html[data-style="ink"] #ink-damage-overlay{position:absolute}

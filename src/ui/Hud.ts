@@ -128,7 +128,7 @@ export class Hud {
       const copy = {
         loading: ['入墨', '墨境将启', '正在铺纸研墨，请稍候。'],
         start: ['破阵', '一纸墨境 · 五阵来敌', '执枪入画，守住此地。击退五阵来敌，迎战墨魁。'],
-        paused: ['暂歇', '战局已暂停', '点击画面继续 · 按退出键可暂停并释放鼠标'],
+        paused: ['暂歇', '战局已暂停', '轻触画面继续'],
         defeat: ['落墨', '此战未竟', '整顿行装，再入墨境。'],
         victory: ['破阵', '五阵尽破 · 墨魁已伏', '这一纸战局，由你写下终章。'],
         playing: ['', '', ''],
@@ -149,17 +149,13 @@ export class Hud {
     } else if (mode === 'start') {
       this.overlayInkTitle.textContent = '破阵';
       this.overlayTitle.textContent = 'BALLPOINT BREACH';
-      this.overlayCopy.textContent = this.inkStyle
-        ? 'survive five waves in an ink-washed construction yard'
-        : 'survive five waves in a construction-yard sketchbook';
-      this.startButton.textContent = this.inkStyle ? 'CLICK TO ENTER THE ARENA' : 'CLICK TO ENTER THE PAGE';
+      this.overlayCopy.textContent = 'survive five waves in a construction-yard sketchbook';
+      this.startButton.textContent = 'CLICK / TAP TO ENTER THE PAGE';
       this.startButton.disabled = false;
     } else if (mode === 'paused') {
       this.overlayInkTitle.textContent = '暂停';
       this.overlayTitle.textContent = 'PAUSED';
-      this.overlayCopy.textContent = this.inkStyle
-        ? 'click the arena to resume · Esc releases the cursor'
-        : 'click the page to resume · Esc releases the cursor';
+      this.overlayCopy.textContent = 'click or tap the page to resume';
     } else if (mode === 'defeat') {
       this.overlayInkTitle.textContent = '败';
       this.overlayTitle.textContent = this.inkStyle ? 'FALLEN' : 'ERASED';
