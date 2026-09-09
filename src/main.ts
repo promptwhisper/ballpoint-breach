@@ -1,8 +1,12 @@
 import { Game, type PublicGameSnapshot } from './game/Game';
+import { ACTIVE_VISUAL_STYLE } from './render';
 import { recordCanvas } from './runtime/canvasRecorder';
 import { installErrorOverlay } from './runtime/errorOverlay';
 import './style.css';
+import { installInkInspector } from './render/inkInspector';
 
+document.documentElement.dataset.style = ACTIVE_VISUAL_STYLE;
+installInkInspector();
 installErrorOverlay();
 
 const params = new URLSearchParams(window.location.search);
@@ -73,11 +77,14 @@ if (record) {
   requestAnimationFrame(() => requestAnimationFrame(() => {
     recordCanvas(canvas, {
       durationSeconds: recordDuration,
-      fileName: 'ballpoint-breach-npc-katana-showcase.webm',
+      fileName: ACTIVE_VISUAL_STYLE === 'ballpoint'
+        ? 'ballpoint-breach-npc-katana-showcase.webm'
+        : 'ballpoint-breach-ink-katana-showcase.webm',
       frameRate: 60,
       width: 1920,
       height: 952,
       notebookOverlay: true,
+      visualStyle: ACTIVE_VISUAL_STYLE,
     });
   }));
 }

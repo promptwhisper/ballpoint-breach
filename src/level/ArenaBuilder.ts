@@ -5,6 +5,9 @@ import {
   type OutlinedMeshGroup,
 } from '../render/OutlinedMesh';
 import { DOODLE_PALETTE } from '../render/palette';
+import { ACTIVE_VISUAL_STYLE } from '../render/visualStyle';
+import { ACTIVE_INK_VERSION, inkUniforms } from '../render/inkSettings';
+import { getInkAtmosphereTexture } from '../render/InkTextures';
 
 export type ArenaColliderCategory =
   | 'ground'
@@ -297,6 +300,8 @@ export interface ArenaBuilderOptions {
 
 type ArenaMaterialName = 'paper' | 'shade' | 'lavender' | 'orange' | 'green' | 'red' | 'deep' | 'sky';
 
+const INK_STYLE_ACTIVE = ACTIVE_VISUAL_STYLE === 'ink';
+
 const SCOUT_PATROL_DURATION_SECONDS = 32;
 const SCOUT_PATROL_PHASE = 0.26;
 const SCOUT_PATROL_POINTS = [
@@ -353,6 +358,7 @@ class ArenaAssembler {
   private scoutAircraft: THREE.Group | null = null;
   private scoutFlightSeconds = 0;
   private disposed = false;
+  private groundWashMaterial: THREE.MeshBasicMaterial | null = null;
 
   constructor(options: ArenaBuilderOptions) {
     this.options = {
@@ -370,22 +376,30 @@ class ArenaAssembler {
       hatchStrength: this.options.hatchStrength,
       hatchVariation: 0.92,
       grainStrength: 0.58,
+      visualStyle: ACTIVE_VISUAL_STYLE,
+      patternSpace: 'world' as const,
+      absorptionScale: 0.26,
+      dryBrushStrength: 0.34,
+      granulationStrength: 0.16,
     };
     this.materials = {
-      paper: new DoodleMaterial({ ...common, surfaceColor: DOODLE_PALETTE.paperLight, seed: 0.3, hatchAngle: 0.02 }),
-      shade: new DoodleMaterial({ ...common, surfaceColor: DOODLE_PALETTE.paperShade, seed: 1.7, hatchScale: this.options.hatchScale * 0.94, hatchStrength: 0.96, hatchAngle: -0.05 }),
-      lavender: new DoodleMaterial({ ...common, surfaceColor: DOODLE_PALETTE.lavender, seed: 2.9, hatchScale: this.options.hatchScale * 0.97, hatchStrength: 1.0, hatchAngle: 0.08 }),
-      orange: new DoodleMaterial({ ...common, surfaceColor: DOODLE_PALETTE.orange, seed: 4.1, hatchScale: this.options.hatchScale * 1.06, hatchStrength: 0.7, hatchAngle: -0.12 }),
-      green: new DoodleMaterial({ ...common, surfaceColor: DOODLE_PALETTE.green, seed: 5.3, hatchScale: this.options.hatchScale * 1.03, hatchStrength: 0.65, hatchAngle: 0.15 }),
-      red: new DoodleMaterial({ ...common, surfaceColor: DOODLE_PALETTE.red, seed: 6.7, hatchScale: this.options.hatchScale * 1.02, hatchStrength: 0.64, hatchAngle: -0.16 }),
-      deep: new DoodleMaterial({ ...common, surfaceColor: 0xc9cbe0, seed: 7.9, hatchScale: this.options.hatchScale * 0.82, hatchStrength: 1.16, hatchAngle: 0.11 }),
+      paper: new DoodleMaterial({ ...common, surfaceColor: DOODLE_PALETTE.paperLight, seed: 0.3, hatchAngle: 0.02, washStrength: 0.76 }),
+      shade: new DoodleMaterial({ ...common, surfaceColor: DOODLE_PALETTE.paperShade, seed: 1.7, hatchScale: this.options.hatchScale * 0.94, hatchStrength: 0.96, hatchAngle: -0.05, washStrength: 0.92 }),
+      lavender: new DoodleMaterial({ ...common, surfaceColor: DOODLE_PALETTE.lavender, seed: 2.9, hatchScale: this.options.hatchScale * 0.97, hatchStrength: 1.0, hatchAngle: 0.08, washStrength: 0.96 }),
+      orange: new DoodleMaterial({ ...common, surfaceColor: DOODLE_PALETTE.orange, seed: 4.1, hatchScale: this.options.hatchScale * 1.06, hatchStrength: 0.7, hatchAngle: -0.12, washStrength: 0.82 }),
+      green: new DoodleMaterial({ ...common, surfaceColor: DOODLE_PALETTE.green, seed: 5.3, hatchScale: this.options.hatchScale * 1.03, hatchStrength: 0.65, hatchAngle: 0.15, washStrength: 0.78 }),
+      red: new DoodleMaterial({ ...common, surfaceColor: DOODLE_PALETTE.red, seed: 6.7, hatchScale: this.options.hatchScale * 1.02, hatchStrength: 0.64, hatchAngle: -0.16, washStrength: 0.92 }),
+      deep: new DoodleMaterial({ ...common, surfaceColor: INK_STYLE_ACTIVE ? DOODLE_PALETTE.softInk : 0xc9cbe0, seed: 7.9, hatchScale: this.options.hatchScale * 0.82, hatchStrength: 1.16, hatchAngle: 0.11, washStrength: 1.14, dryBrushStrength: 0.46 }),
       sky: new DoodleMaterial({
         ...common,
-        surfaceColor: 0xc7cadd,
+        surfaceColor: INK_STYLE_ACTIVE ? DOODLE_PALETTE.lavender : 0xc7cadd,
         seed: 8.6,
         hatchScale: this.options.hatchScale * 0.74,
         hatchStrength: 1.16,
         hatchAngle: -0.07,
+        washStrength: 0.72,
+        dryBrushStrength: 0.24,
+        patternSpace: 'object',
         side: THREE.DoubleSide,
       }),
     };
@@ -453,16 +467,32 @@ class ArenaAssembler {
     rotation?: THREE.Euler,
     raycast = false,
   ): OutlinedMeshGroup {
+    const denseDetail = /(?:rail|step|brace|window|pillar|column|cross|accent)/.test(id);
+    const majorMass = /(?:perimeter|ground|floor|roof|mass|bridge|walk|deck|wall|crate)/.test(id);
+    const v4LineWeight = ACTIVE_INK_VERSION === 'v5'
+      ? denseDetail ? 0.016 : majorMass ? 0.065 : 0.09
+      : denseDetail ? 0.035 : majorMass ? 0.095 : 0.14;
+    const textureInk = ACTIVE_INK_VERSION === 'v4' || ACTIVE_INK_VERSION === 'v5';
+    const lineOpacity = INK_STYLE_ACTIVE && textureInk
+      ? this.options.outlineOpacity * v4LineWeight * (inkUniforms.outlineStrength.value > 0 ? 1 : 0)
+      : this.options.outlineOpacity;
     const visual = createOutlinedMesh(geometry, this.materials[materialName], {
       color: DOODLE_PALETTE.ink,
-      opacity: this.options.outlineOpacity,
+      opacity: lineOpacity,
       irregularity: this.options.outlineIrregularity,
       irregularitySeed: (this.options.seed % 997) + deterministicNameVariant(id) * 17.37,
       segmentLength: 0.58,
-      doubleStroke: true,
-      doubleStrokeOffset: Math.max(0.01, this.options.outlineIrregularity * 0.78),
-      ghostOpacity: 0.4,
-      thresholdAngle: 20,
+      doubleStroke: !(INK_STYLE_ACTIVE && textureInk),
+      doubleStrokeOffset: INK_STYLE_ACTIVE
+        ? Math.max(0.006, this.options.outlineIrregularity * 0.45)
+        : Math.max(0.01, this.options.outlineIrregularity * 0.78),
+      ghostOpacity: INK_STYLE_ACTIVE ? 0.15 : 0.4,
+      visualStyle: ACTIVE_VISUAL_STYLE,
+      primaryOpacityVariation: INK_STYLE_ACTIVE ? 0.36 : 0,
+      primaryBreakup: INK_STYLE_ACTIVE
+        ? textureInk ? (denseDetail ? 0.28 : 0.16) : 0.08
+        : 0,
+      thresholdAngle: INK_STYLE_ACTIVE && textureInk ? 34 : 20,
       name: id,
     });
     visual.position.copy(position);
@@ -620,10 +650,19 @@ class ArenaAssembler {
     const group = new THREE.Group();
     group.name = 'arena-ground-and-perimeter';
     this.root.add(group);
-    this.addBox(group, 'main-ground', new THREE.Vector3(72, 0.35, 78), new THREE.Vector3(0, -0.175, -7), 'paper', {
+    const ground = this.addBox(group, 'main-ground', new THREE.Vector3(72, 0.35, 78), new THREE.Vector3(0, -0.175, -7), 'paper', {
       collider: 'ground',
       tags: ['safe-floor'],
     });
+    if (INK_STYLE_ACTIVE && ACTIVE_INK_VERSION === 'v5') {
+      this.groundWashMaterial = new THREE.MeshBasicMaterial({
+        name: 'pale-ink-earth',
+        map: getInkAtmosphereTexture('ground'),
+        color: 0xffffff,
+        fog: true,
+      });
+      ground.mesh.material = this.groundWashMaterial;
+    }
     this.addBox(group, 'rear-perimeter', new THREE.Vector3(72, 7.2, 0.55), new THREE.Vector3(0, 3.6, -46), 'deep', {
       collider: 'wall',
       tags: ['perimeter'],
@@ -1361,6 +1400,7 @@ class ArenaAssembler {
     for (const visual of this.outlinedMeshes) visual.releaseOutlineResources();
     for (const geometry of this.geometries.values()) geometry.dispose();
     for (const material of Object.values(this.materials)) material.dispose();
+    this.groundWashMaterial?.dispose();
     this.raycastMeshes.length = 0;
   }
 }

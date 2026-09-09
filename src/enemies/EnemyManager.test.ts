@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
-import { DoodleMaterial } from '../render';
+import { ACTIVE_VISUAL_STYLE, DoodleMaterial } from '../render';
 import { EnemyManager } from './EnemyManager';
 import type { EnemyEvent, PlayerDamageEvent } from './types';
 
@@ -81,9 +81,9 @@ test('ordinary NPC rig matches the paper snowman silhouette from the reference',
   const torso = grunt.rig.torso.getObjectByName('torso-hit-zone');
   assert.ok(head instanceof THREE.Mesh && head.material instanceof DoodleMaterial);
   assert.ok(torso instanceof THREE.Mesh && torso.material instanceof DoodleMaterial);
-  assert.equal(head.material.surfaceColor.getHex(), 0xf0eae0);
-  assert.equal(torso.material.surfaceColor.getHex(), 0xf0eae0);
-  assert.equal(head.material.inkColor.getHex(), 0xb63a56);
+  assert.equal(head.material.surfaceColor.getHex(), ACTIVE_VISUAL_STYLE === 'ink' ? 0x646a6a : 0xf0eae0);
+  assert.equal(torso.material.surfaceColor.getHex(), ACTIVE_VISUAL_STYLE === 'ink' ? 0x646a6a : 0xf0eae0);
+  assert.equal(head.material.inkColor.getHex(), ACTIVE_VISUAL_STYLE === 'ink' ? 0x202426 : 0xb63a56);
 
   const headSize = new THREE.Box3().setFromObject(head).getSize(new THREE.Vector3());
   const torsoSize = new THREE.Box3().setFromObject(torso).getSize(new THREE.Vector3());
@@ -146,7 +146,7 @@ test('ordinary NPC drawings keep bounded scale while varying contour, limbs, fac
   const rightLeg = first.rig.root.getObjectByName('right-leg-lower-segment') as THREE.Mesh;
   assert.notEqual(leftLeg.parent?.scale.y, rightLeg.parent?.scale.y, 'leg stroke lengths should differ');
   assert.ok(leftLeg.material instanceof DoodleMaterial);
-  assert.equal(leftLeg.material.surfaceColor.getHex(), 0xcf3f5a);
+  assert.equal(leftLeg.material.surfaceColor.getHex(), ACTIVE_VISUAL_STYLE === 'ink' ? 0x383f41 : 0xcf3f5a);
 
   const leftShoe = first.rig.root.getObjectByName('left-leg-shoe');
   const rightShoe = first.rig.root.getObjectByName('right-leg-shoe');

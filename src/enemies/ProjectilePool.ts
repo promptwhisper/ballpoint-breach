@@ -1,5 +1,9 @@
 import * as THREE from 'three';
+import { ACTIVE_VISUAL_STYLE } from '../render';
+import { createInkStamp } from '../render/InkSplat';
 import type { EnemyAttackKind, EnemyKind, PlayerTarget } from './types';
+
+const INK_STYLE = ACTIVE_VISUAL_STYLE === 'ink';
 
 export interface EnemyProjectileSpawn {
   ownerId: string;
@@ -59,22 +63,50 @@ interface PooledProjectile extends EnemyProjectileView {
   active: boolean;
   object: THREE.Group;
   body: THREE.Mesh;
+  inkSprites: THREE.Sprite[];
 }
 
 const PROJECTILE_GEOMETRY = new THREE.SphereGeometry(0.075, 7, 5);
 const PROJECTILE_EDGES = new THREE.EdgesGeometry(PROJECTILE_GEOMETRY, 12);
-const HOSTILE_MATERIAL = new THREE.MeshBasicMaterial({ color: 0xd63b55 });
-const REFLECTED_MATERIAL = new THREE.MeshBasicMaterial({ color: 0x69b887 });
-const OUTLINE_MATERIAL = new THREE.LineBasicMaterial({ color: 0x27348f, transparent: true, opacity: 0.9 });
+const HOSTILE_MATERIAL = new THREE.MeshBasicMaterial({ color: INK_STYLE ? 0x9f4139 : 0xd63b55 });
+const REFLECTED_MATERIAL = new THREE.MeshBasicMaterial({ color: INK_STYLE ? 0x526b70 : 0x69b887 });
+const OUTLINE_MATERIAL = new THREE.LineBasicMaterial({
+  color: INK_STYLE ? 0x171b1d : 0x27348f,
+  transparent: true,
+  opacity: INK_STYLE ? 0.96 : 0.9,
+});
 
-function createProjectileObject(): { object: THREE.Group; body: THREE.Mesh } {
+const INK_MATERIALS = INK_STYLE ? Array.from({ length: 4 }, (_, index) => {
+  const pixels = createInkStamp(128, 91 + index * 37, [255, 255, 255]);
+  const map = new THREE.DataTexture(new Uint8Array(pixels.buffer), 128, 128);
+  map.needsUpdate = true;
+  map.minFilter = map.magFilter = THREE.LinearFilter;
+  const hostile = new THREE.SpriteMaterial({ map, color: 0x101916, depthWrite: false, transparent: true,
+    opacity: index === 0 ? .96 : .7 - index * .1, rotation: index * 1.7 });
+  const reflected = hostile.clone();
+  reflected.color.setHex(0x426d76);
+  return { hostile, reflected };
+}) : [];
+const FORWARD = new THREE.Vector3(0, 0, 1);
+const travelDirection = new THREE.Vector3();
+
+function createProjectileObject(): { object: THREE.Group; body: THREE.Mesh; inkSprites: THREE.Sprite[] } {
   const object = new THREE.Group();
   object.visible = false;
   const body = new THREE.Mesh(PROJECTILE_GEOMETRY, HOSTILE_MATERIAL);
   const outline = new THREE.LineSegments(PROJECTILE_EDGES, OUTLINE_MATERIAL);
   outline.scale.setScalar(1.06);
   object.add(body, outline);
-  return { object, body };
+  const inkSprites = INK_MATERIALS.map((materials, index) => {
+    const sprite = new THREE.Sprite(materials.hostile);
+    sprite.name = index === 0 ? 'wet-ink-core' : 'trailing-ink-droplet';
+    sprite.scale.setScalar(index === 0 ? .62 : .26 - index * .035);
+    sprite.position.set(index === 0 ? 0 : Math.sin(index * 4) * .045, index === 0 ? 0 : Math.cos(index * 3) * .04, -index * .15);
+    object.add(sprite);
+    return sprite;
+  });
+  if (INK_STYLE) { body.visible = false; outline.visible = false; }
+  return { object, body, inkSprites };
 }
 
 function segmentDistanceSquared(start: THREE.Vector3, end: THREE.Vector3, point: THREE.Vector3): number {
@@ -111,6 +143,7 @@ export class ProjectilePool {
         active: false,
         object: visual.object,
         body: visual.body,
+        inkSprites: visual.inkSprites,
       });
     }
   }
@@ -144,6 +177,8 @@ export class ProjectilePool {
     projectile.object.position.copy(projectile.position);
     projectile.object.scale.setScalar(projectile.radius / 0.075);
     projectile.body.material = HOSTILE_MATERIAL;
+    projectile.inkSprites.forEach((sprite, index) => { sprite.material = INK_MATERIALS[index].hostile; });
+    this.syncInkVisual(projectile);
     return projectile;
   }
 
@@ -186,8 +221,11 @@ export class ProjectilePool {
 
       projectile.position.copy(to);
       projectile.object.position.copy(to);
-      projectile.object.rotation.x += delta * 9;
-      projectile.object.rotation.z += delta * 13;
+      if (INK_STYLE) this.syncInkVisual(projectile);
+      else {
+        projectile.object.rotation.x += delta * 9;
+        projectile.object.rotation.z += delta * 13;
+      }
     }
   }
 
@@ -214,6 +252,8 @@ export class ProjectilePool {
       projectile.velocity.copy(reflectedDirection).multiplyScalar(speed);
       projectile.reflected = true;
       projectile.body.material = REFLECTED_MATERIAL;
+      projectile.inkSprites.forEach((sprite, index) => { sprite.material = INK_MATERIALS[index].reflected; });
+      this.syncInkVisual(projectile);
       reflected.push(projectile);
     }
     return reflected;
@@ -237,6 +277,18 @@ export class ProjectilePool {
 
   clear(): void {
     for (const projectile of this.projectiles) this.release(projectile);
+  }
+
+  private syncInkVisual(projectile: PooledProjectile): void {
+    if (!INK_STYLE) return;
+    travelDirection.copy(projectile.velocity).normalize();
+    if (travelDirection.lengthSq() > 0) projectile.object.quaternion.setFromUnitVectors(FORWARD, travelDirection);
+    projectile.inkSprites.forEach((sprite, index) => {
+      const base = index === 0 ? .62 : .26 - index * .035;
+      const pulse = 1 + Math.sin(projectile.age * 18 + index * 2) * .08;
+      sprite.scale.set(base * pulse, base / pulse, 1);
+      if (index > 0) sprite.position.z = -index * .15 - Math.sin(projectile.age * 14 + index) * .025;
+    });
   }
 
   private release(projectile: PooledProjectile): void {

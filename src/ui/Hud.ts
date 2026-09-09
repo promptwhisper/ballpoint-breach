@@ -1,3 +1,7 @@
+import { ACTIVE_VISUAL_STYLE, isInkStyle } from '../render';
+import { chineseMessage, waveLabel, WEAPON_COPY } from './zhCN';
+import { InkDamageOverlay } from './InkDamageOverlay';
+
 export type OverlayMode = 'loading' | 'start' | 'playing' | 'paused' | 'defeat' | 'victory';
 
 export interface HudWeaponState {
@@ -39,6 +43,7 @@ export class Hud {
   readonly startButton: HTMLButtonElement;
   readonly restartButton: HTMLButtonElement;
   private readonly overlay: HTMLElement;
+  private readonly overlayInkTitle: HTMLElement;
   private readonly overlayTitle: HTMLElement;
   private readonly overlayCopy: HTMLElement;
   private readonly score: HTMLElement;
@@ -57,17 +62,20 @@ export class Hud {
   private readonly bossName: HTMLElement;
   private readonly bossBar: HTMLElement;
   private readonly banner: HTMLElement;
+  private readonly bannerInkTitle: HTMLElement;
   private readonly bannerTitle: HTMLElement;
   private readonly bannerSubtitle: HTMLElement;
   private readonly tip: HTMLElement;
   private readonly hitMarker: HTMLElement;
   private readonly damageIndicator: HTMLElement;
   private readonly scope: HTMLElement;
+  private readonly inkDamage: InkDamageOverlay | null;
   private bannerTimer = 0;
   private tipTimer = 0;
   private hitTimer = 0;
   private damageTimer = 0;
   private damageStack = 0;
+  private readonly inkStyle = isInkStyle(ACTIVE_VISUAL_STYLE);
   private readonly damageChevrons: Array<{ element: HTMLElement; remaining: number }> = [];
 
   constructor(private readonly root: Document = document) {
@@ -77,6 +85,7 @@ export class Hud {
       return value;
     };
     this.overlay = required('#game-overlay');
+    this.overlayInkTitle = required('#overlay-ink-title');
     this.overlayTitle = required('#overlay-title');
     this.overlayCopy = required('#overlay-copy');
     this.startButton = required<HTMLButtonElement>('#start-button');
@@ -97,12 +106,14 @@ export class Hud {
     this.bossName = required('[data-hud="boss-name"]');
     this.bossBar = required('[data-hud="boss-bar"]');
     this.banner = required('#wave-banner');
+    this.bannerInkTitle = required('#wave-banner-ink');
     this.bannerTitle = required('#wave-banner-title');
     this.bannerSubtitle = required('#wave-banner-subtitle');
     this.tip = required('#context-tip');
     this.hitMarker = required('#hit-marker');
     this.damageIndicator = required('#damage-indicator');
     this.scope = required('#scope-overlay');
+    this.inkDamage = this.inkStyle ? new InkDamageOverlay(root) : null;
   }
 
   setMode(mode: OverlayMode): void {
@@ -111,41 +122,69 @@ export class Hud {
     this.overlay.classList.toggle('visible', visible);
     this.startButton.hidden = mode !== 'start' && mode !== 'loading';
     this.restartButton.hidden = mode !== 'defeat' && mode !== 'victory';
+    this.root.body.dataset.gameMode = mode;
+    if (mode !== 'playing') this.inkDamage?.clear();
+    if (this.inkStyle) {
+      const copy = {
+        loading: ['入墨', '墨境将启', '正在铺纸研墨，请稍候。'],
+        start: ['破阵', '一纸墨境 · 五阵来敌', '执枪入画，守住此地。击退五阵来敌，迎战墨魁。'],
+        paused: ['暂歇', '战局已暂停', '点击画面继续 · 按退出键可暂停并释放鼠标'],
+        defeat: ['落墨', '此战未竟', '整顿行装，再入墨境。'],
+        victory: ['破阵', '五阵尽破 · 墨魁已伏', '这一纸战局，由你写下终章。'],
+        playing: ['', '', ''],
+      }[mode];
+      this.overlayInkTitle.textContent = copy[0];
+      this.overlayTitle.textContent = copy[1];
+      this.overlayCopy.textContent = copy[2];
+      this.startButton.textContent = mode === 'loading' ? '正在入墨…' : '入 境';
+      this.startButton.disabled = mode === 'loading';
+      this.restartButton.textContent = mode === 'victory' ? '再战一局' : '重新入阵';
+      return;
+    }
     if (mode === 'loading') {
+      this.overlayInkTitle.textContent = '入墨';
       this.overlayTitle.textContent = 'BALLPOINT BREACH';
-      this.overlayCopy.textContent = 'sharpening pencils…';
+      this.overlayCopy.textContent = this.inkStyle ? 'preparing ink…' : 'sharpening pencils…';
       this.startButton.disabled = true;
     } else if (mode === 'start') {
+      this.overlayInkTitle.textContent = '破阵';
       this.overlayTitle.textContent = 'BALLPOINT BREACH';
-      this.overlayCopy.textContent = 'survive five waves in a construction-yard sketchbook';
-      this.startButton.textContent = 'CLICK TO ENTER THE PAGE';
+      this.overlayCopy.textContent = this.inkStyle
+        ? 'survive five waves in an ink-washed construction yard'
+        : 'survive five waves in a construction-yard sketchbook';
+      this.startButton.textContent = this.inkStyle ? 'CLICK TO ENTER THE ARENA' : 'CLICK TO ENTER THE PAGE';
       this.startButton.disabled = false;
     } else if (mode === 'paused') {
+      this.overlayInkTitle.textContent = '暂停';
       this.overlayTitle.textContent = 'PAUSED';
-      this.overlayCopy.textContent = 'click the page to resume · Esc releases the cursor';
+      this.overlayCopy.textContent = this.inkStyle
+        ? 'click the arena to resume · Esc releases the cursor'
+        : 'click the page to resume · Esc releases the cursor';
     } else if (mode === 'defeat') {
-      this.overlayTitle.textContent = 'ERASED';
-      this.overlayCopy.textContent = 'the page got the better of you';
-      this.restartButton.textContent = 'DRAW AGAIN';
+      this.overlayInkTitle.textContent = '败';
+      this.overlayTitle.textContent = this.inkStyle ? 'FALLEN' : 'ERASED';
+      this.overlayCopy.textContent = this.inkStyle ? 'the ink has run dry' : 'the page got the better of you';
+      this.restartButton.textContent = this.inkStyle ? 'TRY AGAIN' : 'DRAW AGAIN';
     } else if (mode === 'victory') {
-      this.overlayTitle.textContent = 'PAGE CLEARED';
-      this.overlayCopy.textContent = 'THE DOODLER has been erased';
+      this.overlayInkTitle.textContent = '胜';
+      this.overlayTitle.textContent = this.inkStyle ? 'YARD CLEARED' : 'PAGE CLEARED';
+      this.overlayCopy.textContent = this.inkStyle ? 'THE DOODLER has fallen' : 'THE DOODLER has been erased';
       this.restartButton.textContent = 'PLAY AGAIN';
     }
   }
 
   render(snapshot: HudSnapshot): void {
     this.score.textContent = String(snapshot.score);
-    this.wave.textContent = `WAVE ${snapshot.wave}`;
-    this.enemies.textContent = `${snapshot.enemiesLeft} ${snapshot.enemiesLeft === 1 ? 'enemy' : 'enemies'} left`;
+    this.wave.textContent = this.inkStyle ? waveLabel(snapshot.wave) : `WAVE ${snapshot.wave}`;
+    this.enemies.textContent = this.inkStyle ? `余敌 ${snapshot.enemiesLeft} 人` : `${snapshot.enemiesLeft} ${snapshot.enemiesLeft === 1 ? 'enemy' : 'enemies'} left`;
     this.health.textContent = String(Math.ceil(snapshot.health));
     this.healthBar.style.setProperty('--value', `${Math.max(0, snapshot.health / snapshot.maxHealth) * 100}%`);
     const current = snapshot.weapons.find((weapon) => weapon.selected) ?? snapshot.weapons[0];
     if (current) {
       this.ammo.textContent = current.name === 'KATANA' ? '∞' : String(current.ammo);
       this.reserve.textContent = current.name === 'KATANA' ? '' : `/${current.reserve}`;
-      this.weaponName.textContent = current.name;
-      this.weaponDescription.textContent = current.description;
+      this.weaponName.textContent = this.inkStyle ? WEAPON_COPY[current.name]?.name ?? current.name : current.name;
+      this.weaponDescription.textContent = this.inkStyle ? WEAPON_COPY[current.name]?.hint ?? current.description : current.description;
       this.root.body.dataset.reticle = current.name.toLowerCase();
     }
     for (const weapon of snapshot.weapons) {
@@ -161,7 +200,7 @@ export class Hud {
     if (showBlock) this.blockBar.style.setProperty('--value', `${Math.max(0, Math.min(1, snapshot.blockRatio ?? 0)) * 100}%`);
     this.bossWrap.classList.toggle('visible', Boolean(snapshot.boss));
     if (snapshot.boss) {
-      this.bossName.textContent = snapshot.boss.name;
+      this.bossName.textContent = this.inkStyle ? chineseMessage(snapshot.boss.name) : snapshot.boss.name;
       this.bossBar.style.setProperty('--value', `${Math.max(0, snapshot.boss.health / snapshot.boss.maxHealth) * 100}%`);
     }
     this.scope.classList.toggle('visible', Boolean(snapshot.scoped));
@@ -170,14 +209,16 @@ export class Hud {
   }
 
   showBanner(title: string, subtitle: string, duration = 2.2): void {
-    this.bannerTitle.textContent = title;
-    this.bannerSubtitle.textContent = subtitle;
+    this.bannerInkTitle.textContent = title.includes('DOODLER')
+      ? '终局' : title.includes('CLEARED') ? '胜' : '破阵';
+    this.bannerTitle.textContent = this.inkStyle ? chineseMessage(title) : title;
+    this.bannerSubtitle.textContent = this.inkStyle ? chineseMessage(subtitle) : subtitle;
     this.banner.classList.add('visible');
     this.bannerTimer = duration;
   }
 
   showTip(message: string, duration = 4): void {
-    this.tip.textContent = message;
+    this.tip.textContent = this.inkStyle ? chineseMessage(message) : message;
     this.tip.classList.add('visible');
     this.tipTimer = duration;
   }
@@ -189,6 +230,7 @@ export class Hud {
   }
 
   flashDamage(screenAngleRadians: number, damageAmount: number): void {
+    this.inkDamage?.hit(screenAngleRadians, damageAmount);
     const body = this.root.body;
     this.damageStack = accumulateDamageStrength(this.damageStack, damageAmount);
     body.style.setProperty('--damage-strength', this.damageStack.toFixed(3));
@@ -209,6 +251,7 @@ export class Hud {
   }
 
   clearDamageFeedback(): void {
+    this.inkDamage?.clear();
     this.damageTimer = 0;
     this.damageStack = 0;
     this.root.body.classList.remove('player-hit');
@@ -218,7 +261,10 @@ export class Hud {
     this.damageIndicator.classList.remove('visible');
   }
 
+  dispose(): void { this.clearDamageFeedback(); this.inkDamage?.dispose(); }
+
   update(dt: number): void {
+    this.inkDamage?.update(dt);
     this.bannerTimer -= dt;
     this.tipTimer -= dt;
     this.hitTimer -= dt;

@@ -1,1 +1,13 @@
-export function installErrorOverlay():void{window.addEventListener('error',event=>{const stage=document.querySelector<HTMLElement>('#stage');if(stage){stage.textContent=`RUNTIME ERROR · ${event.message}`;stage.style.background='#640b16';stage.style.color='white';return;}const panel=document.createElement('pre');panel.textContent=`Runtime error: ${event.message}`;Object.assign(panel.style,{position:'fixed',inset:'0 0 auto 0',background:'#640b16',color:'white',padding:'12px',zIndex:'99'});document.body.append(panel);});}
+export function installErrorOverlay(): void {
+  window.addEventListener('error', event => {
+    console.error('Game runtime error:', event.error ?? event.message);
+    let panel = document.querySelector<HTMLElement>('#runtime-error');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'runtime-error';
+      panel.setAttribute('role', 'alert');
+      document.body.append(panel);
+    }
+    panel.textContent = '墨境暂时遇到问题，请刷新页面重试。';
+  });
+}

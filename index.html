@@ -1,44 +1,44 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN" data-style="ink">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>BALLPOINT BREACH</title>
+    <title>破阵 · 水墨枪战</title>
   </head>
   <body>
     <canvas id="app"></canvas>
     <div id="paper-lines" aria-hidden="true"></div>
     <div id="vignette" aria-hidden="true"></div>
 
-    <section id="hud" aria-label="Game status">
-      <div class="hud-score">SCORE <strong data-hud="score">0</strong></div>
-      <div class="hud-wave"><strong data-hud="wave">WAVE 1</strong><small data-hud="enemies">0 enemies left</small></div>
+    <section id="hud" aria-label="战局状态">
+      <div class="hud-score"><span>战绩</span> <strong data-hud="score">0</strong></div>
+      <div class="hud-wave"><strong data-hud="wave">第一阵</strong><small data-hud="enemies">余敌 0 人</small></div>
 
       <div id="boss-health">
-        <strong data-hud="boss-name">THE DOODLER</strong>
+        <strong data-hud="boss-name">墨魁</strong>
         <i data-hud="boss-bar"></i>
       </div>
 
-      <div class="hud-health"><span>HP</span><i data-hud="health-bar"></i><b data-hud="health">100</b></div>
-      <div class="hud-ammo"><strong data-hud="ammo">30</strong><span data-hud="reserve">/150</span><div class="ammo-ticks">//// //// //// //// //</div></div>
+      <div class="hud-health"><span>生命</span><i data-hud="health-bar"></i><b data-hud="health">100</b></div>
+      <div class="hud-ammo"><small class="ammo-label">弹药</small><strong data-hud="ammo">30</strong><span data-hud="reserve">/150</span><div class="ammo-ticks" aria-hidden="true">//// //// //// //// //</div></div>
 
       <div class="hud-weapons">
         <ol>
-          <li data-weapon-slot="1" class="selected"><span>RIFLE</span><em data-weapon-ammo>30/150</em></li>
-          <li data-weapon-slot="2"><span>SHOTGUN</span><em data-weapon-ammo>6/30</em></li>
-          <li data-weapon-slot="3"><span>REVOLVER</span><em data-weapon-ammo>6/36</em></li>
-          <li data-weapon-slot="4"><span>SNIPER</span><em data-weapon-ammo>5/25</em></li>
-          <li data-weapon-slot="5"><span>KATANA</span><em data-weapon-ammo>∞</em></li>
+          <li data-weapon-slot="1" class="selected"><span>突击步枪</span><em data-weapon-ammo>30/150</em></li>
+          <li data-weapon-slot="2"><span>霰弹枪</span><em data-weapon-ammo>6/30</em></li>
+          <li data-weapon-slot="3"><span>左轮手枪</span><em data-weapon-ammo>6/36</em></li>
+          <li data-weapon-slot="4"><span>狙击步枪</span><em data-weapon-ammo>5/25</em></li>
+          <li data-weapon-slot="5"><span>长刀</span><em data-weapon-ammo>∞</em></li>
         </ol>
-        <strong data-hud="weapon-name">RIFLE</strong>
-        <small data-hud="weapon-description">auto · aim for the holo sight</small>
+        <strong data-hud="weapon-name">突击步枪</strong>
+        <small data-hud="weapon-description">按住左键连射 · 右键瞄准</small>
       </div>
 
-      <div class="ability-meter grapple-meter"><span>Q · GRAPPLE</span><i data-hud="grapple-bar"></i></div>
-      <div id="block-stamina" class="ability-meter"><span>BLOCK</span><i data-hud="block-bar"></i></div>
+      <div class="ability-meter grapple-meter"><span>Q · 钩索</span><i data-hud="grapple-bar"></i></div>
+      <div id="block-stamina" class="ability-meter"><span>格挡</span><i data-hud="block-bar"></i></div>
 
-      <div id="context-tip">grapple an enemy to yank them off a ledge</div>
-      <div id="wave-banner"><strong id="wave-banner-title">WAVE 1</strong><span id="wave-banner-subtitle">THE INK IS STILL WET</span></div>
+      <div id="context-tip">用钩索将高处的敌人拉下平台</div>
+      <div id="wave-banner"><span id="wave-banner-ink" lang="zh-CN">破阵</span><strong id="wave-banner-title">第一阵</strong><span id="wave-banner-subtitle">初入墨境 · 击退来敌</span></div>
       <div class="crosshair"><i></i><i></i><i></i><i></i></div>
       <div id="hit-marker"><i></i><i></i><i></i><i></i></div>
       <div id="damage-indicator"></div>
@@ -47,20 +47,22 @@
 
     <section id="game-overlay" class="visible" data-mode="loading">
       <div class="overlay-card">
-        <p class="eyebrow">A BALLPOINT-PEN ARENA FPS</p>
-        <h1 id="overlay-title">BALLPOINT<br>BREACH</h1>
-        <p id="overlay-copy">sharpening pencils…</p>
-        <button id="start-button" type="button" disabled>CLICK TO ENTER THE PAGE</button>
-        <button id="restart-button" type="button" hidden>DRAW AGAIN</button>
+        <p class="eyebrow">水墨手绘 · 第一人称射击</p>
+        <span class="ink-seal" aria-hidden="true">墨<br>戏</span>
+        <p id="overlay-ink-title" lang="zh-CN">破阵</p>
+        <h1 id="overlay-title">一纸墨境 · 五阵来敌</h1>
+        <p id="overlay-copy">正在铺纸研墨，请稍候。</p>
+        <button id="start-button" type="button" disabled>正在入墨…</button>
+        <button id="restart-button" type="button" hidden>重新入阵</button>
         <div class="controls-grid">
-          <span><b>WASD</b> MOVE</span><span><b>SHIFT</b> SPRINT</span><span><b>SPACE</b> JUMP</span>
-          <span><b>1–5</b> WEAPONS</span><span><b>R</b> RELOAD</span><span><b>Q</b> GRAPPLE</span>
-          <span><b>LMB</b> ATTACK</span><span><b>RMB</b> AIM / BLOCK</span><span><b>ESC</b> PAUSE</span>
+          <span><b>W A S D</b> 移动</span><span><b>上档键</b> 疾跑</span><span><b>空格键</b> 跳跃</span>
+          <span><b>1—5</b> 切换武器</span><span><b>R</b> 换弹</span><span><b>Q</b> 钩索</span>
+          <span><b>鼠标左键</b> 射击／挥斩</span><span><b>鼠标右键</b> 瞄准／格挡</span><span><b>退出键</b> 暂停</span>
         </div>
       </div>
     </section>
 
-    <div id="stage" role="status">BUILD STAGE · PLAYABLE CORE</div>
+    <div id="stage" role="status">正在准备墨境</div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { DOODLE_PALETTE } from './palette';
+import { paletteForStyle } from './palette';
+import { ACTIVE_VISUAL_STYLE, type VisualStyle } from './visualStyle';
+import { ACTIVE_INK_VERSION } from './inkSettings';
 
 export interface OutlineOptions {
   color?: THREE.ColorRepresentation;
@@ -17,6 +19,12 @@ export interface OutlineOptions {
   doubleStrokeOffset?: number;
   /** Per-vertex alpha of the secondary pen pass. */
   ghostOpacity?: number;
+  /** Selects exact pen lines or pressure-broken ink-brush contours. */
+  visualStyle?: VisualStyle;
+  /** Maximum deterministic alpha loss along the primary contour. */
+  primaryOpacityVariation?: number;
+  /** Fraction of eligible interior primary segments omitted as dry-brush gaps. */
+  primaryBreakup?: number;
   renderOrder?: number;
   linewidth?: number;
   scale?: number;
@@ -56,6 +64,9 @@ export interface HandDrawnEdgesOptions {
   doubleStroke?: boolean;
   doubleStrokeOffset?: number;
   ghostOpacity?: number;
+  visualStyle?: VisualStyle;
+  primaryOpacityVariation?: number;
+  primaryBreakup?: number;
 }
 
 /**
@@ -73,7 +84,22 @@ export function createHandDrawnEdgesGeometry(
   const segmentLength = Math.max(options.segmentLength ?? 0.72, 0.08);
   const doubleStroke = options.doubleStroke ?? false;
   const doubleStrokeOffset = Math.max(options.doubleStrokeOffset ?? irregularity * 0.72, 0);
-  const ghostOpacity = THREE.MathUtils.clamp(options.ghostOpacity ?? 0.28, 0, 1);
+  const visualStyle = options.visualStyle ?? ACTIVE_VISUAL_STYLE;
+  const ghostOpacity = THREE.MathUtils.clamp(
+    options.ghostOpacity ?? (visualStyle === 'ink' ? 0.16 : 0.28),
+    0,
+    1,
+  );
+  const primaryOpacityVariation = THREE.MathUtils.clamp(
+    options.primaryOpacityVariation ?? (visualStyle === 'ink' ? 0.34 : 0),
+    0,
+    0.85,
+  );
+  const primaryBreakup = THREE.MathUtils.clamp(
+    options.primaryBreakup ?? (visualStyle === 'ink' ? 0.075 : 0),
+    0,
+    0.35,
+  );
 
   const exactEdges = new THREE.EdgesGeometry(source, thresholdAngle);
   const exactPositions = exactEdges.getAttribute('position');
@@ -133,12 +159,22 @@ export function createHandDrawnEdgesGeometry(
     for (let segment = 0; segment < subdivisions; segment += 1) {
       const t0 = segment / subdivisions;
       const t1 = (segment + 1) / subdivisions;
-      appendPoint(sample(t0, 0), 1);
-      appendPoint(sample(t1, 0), 1);
+      const canBreakPrimary = subdivisions >= 4 && segment > 0 && segment < subdivisions - 1;
+      const primaryGap = canBreakPrimary
+        && stableNoise(edgeSeed + segment * 8.17 + 41.3) < primaryBreakup;
+      if (!primaryGap) {
+        const alphaStart = 1 - primaryOpacityVariation
+          * stableNoise(edgeSeed + segment * 3.71 + 19.7);
+        const alphaEnd = 1 - primaryOpacityVariation
+          * stableNoise(edgeSeed + segment * 3.71 + 23.9);
+        appendPoint(sample(t0, 0), alphaStart);
+        appendPoint(sample(t1, 0), alphaEnd);
+      }
 
-      // Skip roughly one quarter of the ghost segments, leaving the displaced
-      // pass visibly hand-traced rather than a uniform vector shadow.
-      if (doubleStroke && stableNoise(edgeSeed + segment * 5.73) > 0.24) {
+      // Ink keeps only sparse faded echoes; ballpoint retains the original
+      // three-quarter coverage for an explicitly hand-traced second pass.
+      const echoThreshold = visualStyle === 'ink' ? 0.72 : 0.24;
+      if (doubleStroke && stableNoise(edgeSeed + segment * 5.73) > echoThreshold) {
         appendPoint(sample(t0, 1), ghostOpacity);
         appendPoint(sample(t1, 1), ghostOpacity);
       }
@@ -163,6 +199,9 @@ function acquireEdges(
   doubleStroke: boolean,
   doubleStrokeOffset: number,
   ghostOpacity: number,
+  visualStyle: VisualStyle,
+  primaryOpacityVariation: number,
+  primaryBreakup: number,
 ): EdgeCacheEntry {
   const key = [
     thresholdAngle.toFixed(3),
@@ -172,6 +211,9 @@ function acquireEdges(
     doubleStroke ? 'double' : 'single',
     doubleStrokeOffset.toFixed(5),
     ghostOpacity.toFixed(3),
+    visualStyle,
+    primaryOpacityVariation.toFixed(3),
+    primaryBreakup.toFixed(3),
   ].join(':');
   let entries = edgeCache.get(source);
   if (!entries) {
@@ -192,6 +234,9 @@ function acquireEdges(
     doubleStroke,
     doubleStrokeOffset,
     ghostOpacity,
+    visualStyle,
+    primaryOpacityVariation,
+    primaryBreakup,
   });
   const entry: EdgeCacheEntry = { source, key, geometry, references: 1 };
   entries.set(key, entry);
@@ -266,7 +311,22 @@ export class OutlinedMeshGroup extends THREE.Group {
     const segmentLength = Math.max(options.segmentLength ?? 0.72, 0.08);
     const doubleStroke = options.doubleStroke ?? false;
     const doubleStrokeOffset = Math.max(options.doubleStrokeOffset ?? irregularity * 0.72, 0);
-    const ghostOpacity = THREE.MathUtils.clamp(options.ghostOpacity ?? 0.28, 0, 1);
+    const visualStyle = options.visualStyle ?? ACTIVE_VISUAL_STYLE;
+    const ghostOpacity = THREE.MathUtils.clamp(
+      options.ghostOpacity ?? (visualStyle === 'ink' ? 0.16 : 0.28),
+      0,
+      1,
+    );
+    const primaryOpacityVariation = THREE.MathUtils.clamp(
+      options.primaryOpacityVariation ?? (visualStyle === 'ink' ? 0.34 : 0),
+      0,
+      0.85,
+    );
+    const primaryBreakup = THREE.MathUtils.clamp(
+      options.primaryBreakup ?? (visualStyle === 'ink' ? 0.075 : 0),
+      0,
+      0.35,
+    );
     const opacity = THREE.MathUtils.clamp(options.opacity ?? 0.96, 0, 1);
     const linewidth = Math.max(options.linewidth ?? 1, 1);
 
@@ -279,8 +339,17 @@ export class OutlinedMeshGroup extends THREE.Group {
       doubleStroke,
       doubleStrokeOffset,
       ghostOpacity,
+      visualStyle,
+      primaryOpacityVariation,
+      primaryBreakup,
     );
-    this.materialEntry = acquireLineMaterial(options.color ?? DOODLE_PALETTE.ink, opacity, linewidth);
+    this.materialEntry = acquireLineMaterial(
+      options.color ?? paletteForStyle(visualStyle).ink,
+      opacity * (visualStyle === 'ink' && ACTIVE_INK_VERSION !== 'current'
+        ? ACTIVE_INK_VERSION === 'v5' ? 0.44 : ACTIVE_INK_VERSION === 'v4' ? 0.65 : 0.25
+        : 1),
+      linewidth,
+    );
 
     this.mesh = new THREE.Mesh(geometry, material);
     this.mesh.castShadow = options.castShadow ?? false;

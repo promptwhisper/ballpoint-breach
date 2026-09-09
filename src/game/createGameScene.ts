@@ -1,11 +1,20 @@
 import * as THREE from 'three';
 
-import { DOODLE_PALETTE } from '../render/palette';
+import { paletteForStyle } from '../render/palette';
+import { ACTIVE_INK_VERSION } from '../render/inkSettings';
+import { getInkAtmosphereTexture } from '../render/InkTextures';
+import {
+  ACTIVE_VISUAL_STYLE,
+  isInkStyle,
+  type VisualStyle,
+} from '../render/visualStyle';
 
 export interface GameSceneOptions {
-  /** Warm notebook-paper colour used by both the clear and the atmospheric haze. */
+  /** Visual language used by the clear, atmospheric haze, sky ink, and lights. */
+  style?: VisualStyle;
+  /** Warm paper colour used by both the clear and the atmospheric haze. */
   paperColor?: THREE.ColorRepresentation;
-  /** Ballpoint colour used by the distant line drawings. */
+  /** Ink colour used by the distant line drawings. */
   inkColor?: THREE.ColorRepresentation;
   /** Distance at which the arena begins to blend into the paper. */
   fogNear?: number;
@@ -36,7 +45,11 @@ function makePolyline(
   return line;
 }
 
-function createSun(ink: THREE.ColorRepresentation): THREE.Group {
+function createSun(
+  ink: THREE.ColorRepresentation,
+  accent: THREE.ColorRepresentation,
+  inkStyle: boolean,
+): THREE.Group {
   const root = new THREE.Group();
   root.name = 'sky-sun';
   root.position.set(-13.5, 18.5, 0);
@@ -44,9 +57,9 @@ function createSun(ink: THREE.ColorRepresentation): THREE.Group {
   const wash = new THREE.Mesh(
     new THREE.CircleGeometry(1.2, 36),
     new THREE.MeshBasicMaterial({
-      color: DOODLE_PALETTE.orange,
+      color: accent,
       transparent: true,
-      opacity: 0.17,
+      opacity: inkStyle ? 0.12 : 0.17,
       depthWrite: false,
       fog: true,
       toneMapped: false,
@@ -58,7 +71,7 @@ function createSun(ink: THREE.ColorRepresentation): THREE.Group {
   const outlineMaterial = new THREE.LineBasicMaterial({
     color: ink,
     transparent: true,
-    opacity: 0.62,
+    opacity: inkStyle ? 0.48 : 0.62,
     fog: true,
     toneMapped: false,
   });
@@ -143,6 +156,8 @@ function createSkyDoodles(
   depth: number,
   paper: THREE.ColorRepresentation,
   ink: THREE.ColorRepresentation,
+  accent: THREE.ColorRepresentation,
+  inkStyle: boolean,
 ): THREE.Group {
   const root = new THREE.Group();
   root.name = 'procedural-sky-doodles';
@@ -150,7 +165,7 @@ function createSkyDoodles(
   root.userData.raycastDisabled = true;
   root.userData.nonInteractive = true;
 
-  root.add(createSun(ink));
+  root.add(createSun(ink, accent, inkStyle));
   root.add(createCloud(
     'sky-cloud-west',
     new THREE.Vector3(-4.1, 15.3, -0.35),
@@ -181,21 +196,35 @@ function createSkyDoodles(
  * first-person viewmodel can be attached directly to the returned scene.
  */
 export function createGameScene(options: Readonly<GameSceneOptions> = {}): THREE.Scene {
-  const paper = options.paperColor ?? DOODLE_PALETTE.paper;
-  const ink = options.inkColor ?? DOODLE_PALETTE.ink;
-  const fogNear = Math.max(0, options.fogNear ?? DEFAULT_FOG_NEAR);
-  const fogFar = Math.max(fogNear + 1, options.fogFar ?? DEFAULT_FOG_FAR);
+  const style = options.style ?? ACTIVE_VISUAL_STYLE;
+  const palette = paletteForStyle(style);
+  const inkStyle = isInkStyle(style);
+  const paleAtmosphere = inkStyle && ACTIVE_INK_VERSION === 'v5';
+  const paper = options.paperColor ?? palette.paper;
+  const ink = options.inkColor ?? palette.ink;
+  const fogNear = Math.max(0, options.fogNear ?? (paleAtmosphere ? 30 : DEFAULT_FOG_NEAR));
+  const fogFar = Math.max(fogNear + 1, options.fogFar ?? (paleAtmosphere ? 85 : DEFAULT_FOG_FAR));
 
   const scene = new THREE.Scene();
   scene.name = 'ballpoint-breach-game-scene';
-  scene.background = new THREE.Color(paper);
+  scene.background = paleAtmosphere ? getInkAtmosphereTexture('sky') : new THREE.Color(paper);
   scene.fog = new THREE.Fog(paper, fogNear, fogFar);
-  scene.add(createSkyDoodles(options.skyDepth ?? DEFAULT_SKY_DEPTH, paper, ink));
+  if (!paleAtmosphere) scene.add(createSkyDoodles(
+    options.skyDepth ?? DEFAULT_SKY_DEPTH,
+    paper,
+    ink,
+    palette.orange,
+    inkStyle,
+  ));
 
   if (options.includeLights ?? true) {
-    const fill = new THREE.HemisphereLight(0xfffcf0, 0x8f91bd, 2.15);
+    const fill = new THREE.HemisphereLight(
+      inkStyle ? 0xf3ecdd : 0xfffcf0,
+      inkStyle ? 0x747778 : 0x8f91bd,
+      inkStyle ? 1.9 : 2.15,
+    );
     fill.name = 'paper-sky-fill';
-    const key = new THREE.DirectionalLight(0xfff1cc, 2.75);
+    const key = new THREE.DirectionalLight(inkStyle ? 0xfff5df : 0xfff1cc, inkStyle ? 2.45 : 2.75);
     key.name = 'warm-doodle-key';
     key.position.set(-12, 19, 10);
     scene.add(fill, key);

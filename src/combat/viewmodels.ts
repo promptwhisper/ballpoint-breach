@@ -1,8 +1,17 @@
 import * as THREE from 'three';
-import { createHandDrawnEdgesGeometry, DoodleMaterial } from '../render';
+import {
+  ACTIVE_VISUAL_STYLE,
+  createHandDrawnEdgesGeometry,
+  DoodleMaterial,
+  DOODLE_PALETTE,
+} from '../render';
 import type { WeaponId } from './types';
+import { ACTIVE_INK_VERSION } from '../render/inkSettings';
+import { getHeroInkTexture } from '../render/InkTextures';
 
-const PALETTE = Object.freeze({
+const INK_STYLE = ACTIVE_VISUAL_STYLE === 'ink';
+
+const BALLPOINT_PALETTE = Object.freeze({
   paper: 0xf6f0dc,
   paperShade: 0xd7d8df,
   lavender: 0xb8bbd8,
@@ -11,6 +20,18 @@ const PALETTE = Object.freeze({
   redInk: 0xd63b55,
   orangeInk: 0xe79a32,
 });
+
+const INK_PALETTE = Object.freeze({
+  paper: DOODLE_PALETTE.paperLight,
+  paperShade: 0xaaa9a2,
+  lavender: 0x777b7b,
+  blueInk: 0x171b1d,
+  darkBlue: 0x0e1112,
+  redInk: 0x9f4139,
+  orangeInk: 0xb67243,
+});
+
+const PALETTE = INK_STYLE ? INK_PALETTE : BALLPOINT_PALETTE;
 
 type PartMaterial = 'paper' | 'shade' | 'hatch' | 'deepHatch' | 'ink' | 'red' | 'orange' | 'lens';
 type Vec3 = readonly [number, number, number];
@@ -51,6 +72,70 @@ const unitDodecahedron = new THREE.DodecahedronGeometry(0.5, 0);
 const unitSphere8 = new THREE.SphereGeometry(0.5, 8, 6);
 const unitTorus = new THREE.TorusGeometry(0.5, 0.075, 6, 18);
 
+function pixelNoise(x: number, y: number, seed: number): number {
+  const raw = Math.sin(x * 12.9898 + y * 78.233 + seed * 37.719) * 43758.5453;
+  return raw - Math.floor(raw);
+}
+
+function makeAlphaTexture(
+  width: number,
+  height: number,
+  alphaAt: (u: number, v: number, x: number, y: number) => number,
+): THREE.DataTexture {
+  const data = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const offset = (y * width + x) * 4;
+      const alpha = THREE.MathUtils.clamp(alphaAt(x / (width - 1), y / (height - 1), x, y), 0, 1);
+      data[offset] = 255;
+      data[offset + 1] = 255;
+      data[offset + 2] = 255;
+      data[offset + 3] = Math.round(alpha * 255);
+    }
+  }
+  const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function makeKatanaBrushTexture(): THREE.DataTexture {
+  return makeAlphaTexture(192, 48, (u, v, x, y) => {
+    const centeredY = v - 0.5;
+    const center = Math.sin(u * 15.7) * 0.018 + Math.sin(u * 37.1) * 0.008;
+    const taper = 0.44 * Math.pow(1 - u, 0.3) + 0.035;
+    const edge = taper * (0.88 + (pixelNoise(Math.floor(u * 34), 0, 13) - 0.5) * 0.24);
+    const edgeDistance = edge - Math.abs(centeredY - center);
+    if (edgeDistance <= 0) return 0;
+    const edgeAlpha = THREE.MathUtils.smoothstep(edgeDistance, 0, 0.08);
+    const fibre = pixelNoise(x, Math.floor(y * 0.42), 29);
+    const longitudinalGap = pixelNoise(Math.floor(x * 0.18), Math.floor(y * 0.65), 43);
+    const tailDryness = THREE.MathUtils.smoothstep(u, 0.38, 1);
+    const dryGap = tailDryness > 0 && (fibre > 0.89 - tailDryness * 0.14 || longitudinalGap > 0.965);
+    if (dryGap) return 0;
+    return edgeAlpha * (0.74 + pixelNoise(x, y, 61) * 0.26);
+  });
+}
+
+function makeKatanaBloodTexture(): THREE.DataTexture {
+  return makeAlphaTexture(64, 64, (u, v, x, y) => {
+    const dx = (u - 0.5) * 2;
+    const dy = (v - 0.5) * 2;
+    const angle = Math.atan2(dy, dx);
+    const radius = Math.hypot(dx, dy);
+    const raggedEdge = 0.83 + Math.sin(angle * 5 + 0.7) * 0.11 + Math.sin(angle * 11 - 0.4) * 0.055;
+    if (radius > raggedEdge) return 0;
+    const absorption = 1 - THREE.MathUtils.smoothstep(radius, raggedEdge * 0.62, raggedEdge);
+    const dryGap = radius > 0.24 && pixelNoise(Math.floor(x * 0.45), Math.floor(y * 0.2), 73) > 0.965;
+    return dryGap ? 0 : 0.52 + absorption * 0.44;
+  });
+}
+
+const katanaTrailTexture = INK_STYLE ? makeKatanaBrushTexture() : null;
+const katanaBloodTexture = INK_STYLE ? makeKatanaBloodTexture() : null;
+
 const edgeCache = new WeakMap<THREE.BufferGeometry, Map<number, THREE.BufferGeometry>>();
 const outlineMaterial = new THREE.LineBasicMaterial({
   color: PALETTE.blueInk,
@@ -63,25 +148,69 @@ const outlineMaterial = new THREE.LineBasicMaterial({
 const softOutlineMaterial = new THREE.LineBasicMaterial({
   color: PALETTE.blueInk,
   transparent: true,
-  opacity: 0.5,
+  opacity: INK_STYLE ? 0.32 : 0.5,
   depthTest: true,
   depthWrite: false,
   vertexColors: true,
 });
 const katanaTrailMaterial = new THREE.MeshBasicMaterial({
   color: PALETTE.blueInk,
+  map: katanaTrailTexture,
   transparent: true,
-  opacity: 0.88,
+  opacity: INK_STYLE ? 0.94 : 0.88,
+  alphaTest: INK_STYLE ? 0.045 : 0,
   depthTest: false,
   depthWrite: false,
   side: THREE.DoubleSide,
 });
 
+function makeViewmodelMaterial(
+  surfaceColor: THREE.ColorRepresentation,
+  hatchScale: number,
+  hatchStrength: number,
+  seed: number,
+  washStrength: number,
+  dryBrushStrength: number,
+  washBias: number,
+  heroScan = false,
+): DoodleMaterial {
+  return new DoodleMaterial({
+    surfaceColor,
+    hatchScale,
+    hatchStrength,
+    seed,
+    ...(INK_STYLE ? {
+      paperColor: DOODLE_PALETTE.paper,
+      inkColor: PALETTE.darkBlue,
+      shadowColor: 0x111517,
+      patternSpace: 'object' as const,
+      ...(heroScan && ACTIVE_INK_VERSION === 'v5' ? {
+        inkBrushMap: getHeroInkTexture('weapon'),
+      } : {}),
+      washStrength: heroScan && ACTIVE_INK_VERSION === 'v5' ? washStrength * 0.80 : washStrength,
+      washBias: heroScan && ACTIVE_INK_VERSION === 'v5' ? washBias * 0.50 : washBias,
+      dryBrushStrength,
+      granulationStrength: 0.22,
+    } : {}),
+  });
+}
+
+const katanaBloodMaterial = INK_STYLE
+  ? new THREE.MeshBasicMaterial({
+    color: PALETTE.redInk,
+    map: katanaBloodTexture,
+    transparent: true,
+    alphaTest: 0.055,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  })
+  : null;
+
 const materials: Readonly<Record<PartMaterial, THREE.Material>> = Object.freeze({
-  paper: new DoodleMaterial({ surfaceColor: PALETTE.paper, hatchScale: 7.2, hatchStrength: 0.46, seed: 11.2 }),
-  shade: new DoodleMaterial({ surfaceColor: PALETTE.paperShade, hatchScale: 7.2, hatchStrength: 0.72, seed: 12.4 }),
-  hatch: new DoodleMaterial({ surfaceColor: PALETTE.lavender, hatchScale: 7.0, hatchStrength: 0.9, seed: 13.8 }),
-  deepHatch: new DoodleMaterial({ surfaceColor: PALETTE.lavender, hatchScale: 6.8, hatchStrength: 1.14, seed: 15.1 }),
+  paper: makeViewmodelMaterial(PALETTE.paper, 7.2, 0.46, 11.2, 0.9, 0.16, 0.28),
+  shade: makeViewmodelMaterial(PALETTE.paperShade, 7.2, 0.72, 12.4, 1.02, 0.22, 0.34),
+  hatch: makeViewmodelMaterial(PALETTE.lavender, 7.0, 0.9, 13.8, 1.12, 0.28, 0.4),
+  deepHatch: makeViewmodelMaterial(PALETTE.lavender, 6.8, 1.14, 15.1, 1.24, 0.34, 0.46),
   ink: new THREE.MeshBasicMaterial({ color: PALETTE.darkBlue }),
   red: new THREE.MeshBasicMaterial({ color: PALETTE.redInk }),
   orange: new THREE.MeshBasicMaterial({ color: PALETTE.orangeInk }),
@@ -93,6 +222,16 @@ const materials: Readonly<Record<PartMaterial, THREE.Material>> = Object.freeze(
     side: THREE.DoubleSide,
   }),
 });
+
+// Firearm surfaces get scanned brushwork; hands, blade and optical marks retain
+// their existing materials. All weapon instances share these four materials.
+const firearmMaterials: Partial<Record<PartMaterial, THREE.Material>> =
+  INK_STYLE && ACTIVE_INK_VERSION === 'v5' ? {
+    paper: makeViewmodelMaterial(PALETTE.paper, 7.2, 0.46, 11.2, 0.9, 0.16, 0.28, true),
+    shade: makeViewmodelMaterial(PALETTE.paperShade, 7.2, 0.72, 12.4, 1.02, 0.22, 0.34, true),
+    hatch: makeViewmodelMaterial(PALETTE.lavender, 7.0, 0.9, 13.8, 1.12, 0.28, 0.4, true),
+    deepHatch: makeViewmodelMaterial(PALETTE.lavender, 6.8, 1.14, 15.1, 1.24, 0.34, 0.46, true),
+  } : {};
 
 function outlineVariant(name: string): number {
   let hash = 2166136261;
@@ -140,7 +279,12 @@ function addPart(parent: THREE.Object3D, options: PartOptions): THREE.Group {
   const group = new THREE.Group();
   group.name = options.name;
   const geometry = options.geometry ?? unitBox;
-  const mesh = new THREE.Mesh(geometry, materials[options.material ?? 'paper']);
+  const materialKey = options.material ?? 'paper';
+  const firearmSurface = /^(rifle|shotgun|revolver|sniper)-/.test(options.name)
+    && !options.name.includes('-hand');
+  const material = firearmSurface
+    ? firearmMaterials[materialKey] ?? materials[materialKey] : materials[materialKey];
+  const mesh = new THREE.Mesh(geometry, material);
   mesh.name = `${options.name}-fill`;
   mesh.castShadow = false;
   mesh.receiveShadow = false;
@@ -613,7 +757,10 @@ function createKatanaViewmodel(): WeaponViewmodel {
     stain.name = `katana-blood-stain-${index + 1}`;
     stain.visible = false;
     for (const side of [-1, 1]) {
-      const mark = new THREE.Mesh(new THREE.CircleGeometry(0.5, 7), materials.red);
+      const mark = new THREE.Mesh(
+        new THREE.CircleGeometry(0.5, 7),
+        katanaBloodMaterial ?? materials.red,
+      );
       mark.name = `katana-blood-stain-${index + 1}-${side < 0 ? 'back' : 'front'}`;
       mark.position.set(side * 0.032, y, z);
       mark.rotation.set(0, side * Math.PI / 2, rotation * side);
@@ -662,13 +809,44 @@ function createKatanaViewmodel(): WeaponViewmodel {
     [-0.54, -0.18, -1.03, -0.98, 0.19],
     [-0.55, -0.32, -1.04, -1.12, 0.16],
   ] as const;
+  const inkTrailPoints = INK_STYLE
+    ? (() => {
+      const controls = dashArc.map(([x, y, z]) => new THREE.Vector3(x, y, z));
+      const first = controls[0];
+      const second = controls[1];
+      const last = controls[controls.length - 1];
+      const penultimate = controls[controls.length - 2];
+      const start = first.clone().add(first.clone().sub(second).normalize().multiplyScalar(0.07));
+      const end = last.clone().add(last.clone().sub(penultimate).normalize().multiplyScalar(0.07));
+      return new THREE.CatmullRomCurve3([start, ...controls, end], false, 'centripetal')
+        .getSpacedPoints(dashArc.length);
+    })()
+    : null;
   for (let index = 0; index < dashArc.length; index += 1) {
     const [x, y, z, rotationZ, length] = dashArc[index];
-    const dash = new THREE.Mesh(dashGeometry, katanaTrailMaterial);
+    const dashMaterial = INK_STYLE ? katanaTrailMaterial.clone() : katanaTrailMaterial;
+    const dash = new THREE.Mesh(dashGeometry, dashMaterial);
     dash.name = `katana-reference-dash-${index + 1}`;
-    dash.position.set(x, y, z);
-    dash.rotation.z = rotationZ;
-    dash.scale.set(length, 0.028 + (index % 2) * 0.004, 1);
+    if (INK_STYLE && inkTrailPoints && katanaTrailTexture) {
+      const start = inkTrailPoints[index];
+      const end = inkTrailPoints[index + 1];
+      const deltaX = end.x - start.x;
+      const deltaY = end.y - start.y;
+      const segmentTexture = katanaTrailTexture.clone();
+      segmentTexture.repeat.set(1 / dashArc.length, 1);
+      segmentTexture.offset.set(index / dashArc.length, 0);
+      segmentTexture.needsUpdate = true;
+      dashMaterial.map = segmentTexture;
+      dashMaterial.opacity = 0.94;
+      dashMaterial.needsUpdate = true;
+      dash.position.copy(start).lerp(end, 0.5);
+      dash.rotation.z = Math.atan2(deltaY, deltaX);
+      dash.scale.set(Math.hypot(deltaX, deltaY) * 1.1, 0.11, 1);
+    } else {
+      dash.position.set(x, y, z);
+      dash.rotation.z = rotationZ;
+      dash.scale.set(length, 0.028 + (index % 2) * 0.004, 1);
+    }
     dash.renderOrder = 35;
     dash.frustumCulled = false;
     trail.add(dash);

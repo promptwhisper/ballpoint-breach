@@ -1,5 +1,14 @@
 import * as THREE from 'three';
-import { DOODLE_PALETTE } from './palette';
+import { CURRENT_INK_PALETTE, paletteForStyle } from './palette';
+import { ACTIVE_VISUAL_STYLE, type VisualStyle } from './visualStyle';
+import {
+  ACTIVE_INK_V4_STAGE,
+  ACTIVE_INK_VERSION,
+  inkUniforms,
+  type InkVersion,
+} from './inkSettings';
+import { inkBrushTexture, xuanPaperTexture } from './InkTextures';
+import { INK_TONE_FRAGMENT, INK_V4_TONE_FRAGMENT, INK_V5_TONE_FRAGMENT } from './InkTone';
 
 function fraction(value: number): number {
   return value - Math.floor(value);
@@ -19,7 +28,7 @@ function seedTurnFor(seed: number): number {
   return (fraction((px + py) * pz) - 0.5) * 0.18;
 }
 
-const VERTEX_SHADER = /* glsl */ `
+const BALLPOINT_VERTEX_SHADER = /* glsl */ `
   varying vec3 vWorldNormal;
   varying vec3 vWorldPosition;
 
@@ -36,7 +45,7 @@ const VERTEX_SHADER = /* glsl */ `
   }
 `;
 
-const FRAGMENT_SHADER = /* glsl */ `
+const BALLPOINT_FRAGMENT_SHADER = /* glsl */ `
   uniform vec3 uSurfaceColor;
   uniform vec3 uPaperColor;
   uniform vec3 uInkColor;
@@ -202,6 +211,162 @@ const FRAGMENT_SHADER = /* glsl */ `
   }
 `;
 
+const INK_VERTEX_SHADER = /* glsl */ `
+  uniform float uPatternSpace;
+
+  varying vec3 vWorldNormal;
+  varying vec3 vPatternPosition;
+  varying vec3 vPatternNormal;
+  varying vec3 vInkViewDirection;
+
+  #include <fog_pars_vertex>
+
+  void main() {
+    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+    vec3 modelScale = max(
+      vec3(
+        length(modelMatrix[0].xyz),
+        length(modelMatrix[1].xyz),
+        length(modelMatrix[2].xyz)
+      ),
+      vec3(0.0001)
+    );
+
+    // Object-space marks move with animated meshes. Static arena materials opt
+    // into world space so repeated shared geometries do not repeat one stamp.
+    vec3 scaledObjectPosition = position * modelScale;
+    vPatternPosition = mix(scaledObjectPosition, worldPosition.xyz, step(0.5, uPatternSpace));
+
+    // Correct the normal for the non-uniform scales used by procedural parts
+    // while keeping the result in the world space used by uLightDirection.
+    vec3 scaleSquared = max(modelScale * modelScale, vec3(0.0001));
+    vWorldNormal = normalize(mat3(modelMatrix) * (normal / scaleSquared));
+    vPatternNormal = mix(normalize(normal / modelScale), vWorldNormal, step(0.5, uPatternSpace));
+    vInkViewDirection = cameraPosition - worldPosition.xyz;
+
+    vec4 mvPosition = viewMatrix * worldPosition;
+    gl_Position = projectionMatrix * mvPosition;
+    #include <fog_vertex>
+  }
+`;
+
+const INK_FRAGMENT_SHADER = /* glsl */ `
+  uniform vec3 uSurfaceColor;
+  uniform vec3 uPaperColor;
+  uniform vec3 uInkColor;
+  uniform vec3 uShadowColor;
+  uniform vec3 uLightDirection;
+  uniform float uWashBias;
+  uniform float uWashStrength;
+  uniform float uWashContrast;
+  uniform float uAbsorptionScale;
+  uniform float uDryBrushStrength;
+  uniform float uGranulationStrength;
+  uniform float uOpacity;
+  uniform float uSeed;
+
+  varying vec3 vWorldNormal;
+  varying vec3 vPatternPosition;
+
+  #include <fog_pars_fragment>
+
+  float hash31(vec3 value) {
+    vec3 p3 = fract(value * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+  }
+
+  float valueNoise(vec3 value) {
+    vec3 cell = floor(value);
+    vec3 local = fract(value);
+    vec3 curve = local * local * (3.0 - 2.0 * local);
+
+    float x00 = mix(hash31(cell), hash31(cell + vec3(1.0, 0.0, 0.0)), curve.x);
+    float x10 = mix(
+      hash31(cell + vec3(0.0, 1.0, 0.0)),
+      hash31(cell + vec3(1.0, 1.0, 0.0)),
+      curve.x
+    );
+    float x01 = mix(
+      hash31(cell + vec3(0.0, 0.0, 1.0)),
+      hash31(cell + vec3(1.0, 0.0, 1.0)),
+      curve.x
+    );
+    float x11 = mix(
+      hash31(cell + vec3(0.0, 1.0, 1.0)),
+      hash31(cell + vec3(1.0, 1.0, 1.0)),
+      curve.x
+    );
+    return mix(mix(x00, x10, curve.y), mix(x01, x11, curve.y), curve.z);
+  }
+
+  void main() {
+    vec3 normal = normalize(vWorldNormal);
+    float light = clamp(dot(normal, normalize(uLightDirection)) * 0.5 + 0.5, 0.0, 1.0);
+    float shade = pow(max(1.0 - light, 0.0001), uWashContrast);
+
+    vec3 seedOffset = vec3(uSeed * 0.37, uSeed * 0.61, uSeed * -0.43);
+    vec3 macroCoordinate = vPatternPosition * uAbsorptionScale + seedOffset;
+    float absorption = valueNoise(macroCoordinate);
+
+    // Broad absorption perturbs the illumination boundary instead of drawing a
+    // precise CG contour between tones. Four overlapping soft masses build up
+    // from mostly bare paper to pooled near-black ink.
+    float shapedAbsorption = smoothstep(0.16, 0.84, absorption);
+    float brokenShade = clamp(
+      shade + uWashBias + (shapedAbsorption - 0.5) * (0.28 + shade * 0.10),
+      0.0,
+      1.0
+    );
+    float wash = smoothstep(0.08, 0.33, brokenShade) * 0.14;
+    wash += smoothstep(0.27, 0.51, brokenShade) * 0.20;
+    wash += smoothstep(0.47, 0.71, brokenShade) * 0.25;
+    wash += smoothstep(0.67, 0.90, brokenShade) * 0.27;
+    float pooling = smoothstep(0.62, 0.91, shapedAbsorption)
+      * smoothstep(0.24, 0.86, brokenShade)
+      * 0.14;
+    float cloudyMass = (shapedAbsorption - 0.5)
+      * mix(0.20, 0.36, brokenShade)
+      * smoothstep(0.045, 0.34, shade);
+    wash = clamp((wash + pooling + cloudyMass) * uWashStrength, 0.0, 0.97);
+
+    // An anisotropic second scale creates sparse dry-brush paper breaks. The
+    // same stable detail also supplies restrained pigment granulation.
+    vec3 detailCoordinate = vPatternPosition
+      * vec3(0.72, 4.15, 1.08)
+      * (uAbsorptionScale * 2.35)
+      + seedOffset.zyx
+      + vec3(7.1, -3.7, 11.3);
+    float brushDetail = valueNoise(detailCoordinate);
+    float detailFootprint = max(length(dFdx(detailCoordinate)), length(dFdy(detailCoordinate)));
+    float detailFade = 1.0 - smoothstep(0.45, 1.35, detailFootprint);
+    float dryGate = smoothstep(0.34, 0.78, wash);
+    float paperBreak = (1.0 - smoothstep(0.25, 0.49, brushDetail))
+      * dryGate
+      * uDryBrushStrength
+      * detailFade;
+    wash *= 1.0 - paperBreak;
+
+    float granulation = (brushDetail - 0.5)
+      * uGranulationStrength
+      * detailFade
+      * (0.035 + wash * 0.055);
+    wash = clamp(wash + granulation, 0.0, 0.97);
+
+    vec3 paperBase = mix(uPaperColor, uSurfaceColor, 0.28);
+    vec3 middleInk = mix(uInkColor, uShadowColor, 0.28);
+    vec3 inkTone = mix(middleInk, uShadowColor, smoothstep(0.68, 0.96, brokenShade));
+    vec3 finalColor = mix(paperBase, inkTone, wash);
+
+    gl_FragColor = vec4(finalColor, uOpacity);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+    #include <fog_fragment>
+  }
+`;
+
+export type DoodlePatternSpace = 'world' | 'object';
+
 export interface DoodleMaterialOptions {
   surfaceColor?: THREE.ColorRepresentation;
   paperColor?: THREE.ColorRepresentation;
@@ -216,6 +381,26 @@ export interface DoodleMaterialOptions {
   hatchVariation?: number;
   /** Strength of the fine paper-fibre modulation. */
   grainStrength?: number;
+  /** Selects the legacy hatch shader or the rice-paper ink-wash shader. */
+  visualStyle?: VisualStyle;
+  inkVersion?: InkVersion;
+  /** World space avoids repetition on static architecture; object space follows moving meshes. */
+  patternSpace?: DoodlePatternSpace;
+  /** Optional V5 scans for authored small-object brushwork. */
+  inkBrushMap?: THREE.Texture;
+  paperMap?: THREE.Texture;
+  /** Overall density of the continuous ink wash. */
+  washStrength?: number;
+  /** Adds a bounded base ink load before the soft wash masses are evaluated. */
+  washBias?: number;
+  /** Shapes the light-to-wash response without introducing hard toon bands. */
+  washContrast?: number;
+  /** World/object-unit frequency of the broad paper absorption field. */
+  absorptionScale?: number;
+  /** Amount of local paper reveal through dark brush masses. */
+  dryBrushStrength?: number;
+  /** Strength of fine, derivative-faded pigment variation. */
+  granulationStrength?: number;
   opacity?: number;
   seed?: number;
   side?: THREE.Side;
@@ -238,26 +423,40 @@ type DoodleUniforms = {
   uHatchVariation: THREE.IUniform<number>;
   uGrainStrength: THREE.IUniform<number>;
   uSeedTurn: THREE.IUniform<number>;
+  uPatternSpace: THREE.IUniform<number>;
+  uWashBias: THREE.IUniform<number>;
+  uWashStrength: THREE.IUniform<number>;
+  uWashContrast: THREE.IUniform<number>;
+  uAbsorptionScale: THREE.IUniform<number>;
+  uDryBrushStrength: THREE.IUniform<number>;
+  uGranulationStrength: THREE.IUniform<number>;
   uOpacity: THREE.IUniform<number>;
   uSeed: THREE.IUniform<number>;
+  uInkBrushTexture: THREE.IUniform<THREE.Texture>;
+  uPaperTexture: THREE.IUniform<THREE.Texture>;
 };
 
 /**
- * Four-band, screen-space crosshatch material used by level, weapon, and enemy geometry.
- * It deliberately avoids PBR highlights so every surface reads as ink on warm paper.
+ * Shared non-PBR material facade for the legacy ballpoint and current ink-wash styles.
  */
 export class DoodleMaterial extends THREE.ShaderMaterial {
   declare uniforms: DoodleUniforms;
   readonly isDoodleMaterial = true;
+  readonly visualStyle: VisualStyle;
+  readonly isInkWashMaterial: boolean;
 
   constructor(options: DoodleMaterialOptions = {}) {
     const opacity = THREE.MathUtils.clamp(options.opacity ?? 1, 0, 1);
     const seed = options.seed ?? 0;
+    const visualStyle = options.visualStyle ?? ACTIVE_VISUAL_STYLE;
+    const patternSpace = options.patternSpace ?? 'object';
+    const palette = visualStyle === 'ink' && (options.inkVersion ?? ACTIVE_INK_VERSION) === 'current'
+      ? CURRENT_INK_PALETTE : paletteForStyle(visualStyle);
     const doodleUniforms: DoodleUniforms = {
-      uSurfaceColor: { value: new THREE.Color(options.surfaceColor ?? DOODLE_PALETTE.paperLight) },
-      uPaperColor: { value: new THREE.Color(options.paperColor ?? DOODLE_PALETTE.paper) },
-      uInkColor: { value: new THREE.Color(options.inkColor ?? DOODLE_PALETTE.ink) },
-      uShadowColor: { value: new THREE.Color(options.shadowColor ?? DOODLE_PALETTE.darkInk) },
+      uSurfaceColor: { value: new THREE.Color(options.surfaceColor ?? palette.paperLight) },
+      uPaperColor: { value: new THREE.Color(options.paperColor ?? palette.paper) },
+      uInkColor: { value: new THREE.Color(options.inkColor ?? palette.ink) },
+      uShadowColor: { value: new THREE.Color(options.shadowColor ?? palette.darkInk) },
       uLightDirection: {
         value: (options.lightDirection ?? new THREE.Vector3(-0.42, 0.82, 0.38)).clone().normalize(),
       },
@@ -267,8 +466,19 @@ export class DoodleMaterial extends THREE.ShaderMaterial {
       uHatchVariation: { value: THREE.MathUtils.clamp(options.hatchVariation ?? 0.72, 0, 1.5) },
       uGrainStrength: { value: THREE.MathUtils.clamp(options.grainStrength ?? 0.72, 0, 1.5) },
       uSeedTurn: { value: seedTurnFor(seed) },
+      uPatternSpace: { value: patternSpace === 'world' ? 1 : 0 },
+      uWashBias: { value: THREE.MathUtils.clamp(options.washBias ?? 0, 0, 0.5) },
+      uWashStrength: {
+        value: THREE.MathUtils.clamp(options.washStrength ?? options.hatchStrength ?? 0.78, 0, 1.5),
+      },
+      uWashContrast: { value: THREE.MathUtils.clamp(options.washContrast ?? 1, 0.25, 2.5) },
+      uAbsorptionScale: { value: THREE.MathUtils.clamp(options.absorptionScale ?? 0.42, 0.04, 4) },
+      uDryBrushStrength: { value: THREE.MathUtils.clamp(options.dryBrushStrength ?? 0.22, 0, 1) },
+      uGranulationStrength: { value: THREE.MathUtils.clamp(options.granulationStrength ?? 0.18, 0, 1) },
       uOpacity: { value: opacity },
       uSeed: { value: seed },
+      uInkBrushTexture: { value: options.inkBrushMap ?? inkBrushTexture },
+      uPaperTexture: { value: options.paperMap ?? xuanPaperTexture },
     };
     // ShaderMaterial does not add fog uniforms automatically. Three's renderer
     // still refreshes them when `fog` is true, so merge the standard block once.
@@ -276,12 +486,25 @@ export class DoodleMaterial extends THREE.ShaderMaterial {
       THREE.UniformsLib.fog,
       doodleUniforms,
     ]) as unknown as DoodleUniforms;
+    // UniformsUtils clones textures; retain shared loading and GPU ownership.
+    uniforms.uInkBrushTexture.value = doodleUniforms.uInkBrushTexture.value;
+    uniforms.uPaperTexture.value = doodleUniforms.uPaperTexture.value;
 
     super({
       name: 'DoodleMaterial',
+      defines: {
+        ...(['v2', 'v3'].includes(options.inkVersion ?? ACTIVE_INK_VERSION) ? { INK_PAPER: 1 } : {}),
+        ...((options.inkVersion ?? ACTIVE_INK_VERSION) === 'v3' ? { INK_DRY_BRUSH: 1 } : {}),
+        ...((options.inkVersion ?? ACTIVE_INK_VERSION) === 'v4'
+          && ACTIVE_INK_V4_STAGE !== 'a' ? { INK_V4_BRUSH: 1 } : {}),
+      },
       uniforms,
-      vertexShader: VERTEX_SHADER,
-      fragmentShader: FRAGMENT_SHADER,
+      vertexShader: visualStyle === 'ballpoint' ? BALLPOINT_VERTEX_SHADER : INK_VERTEX_SHADER,
+      fragmentShader: visualStyle === 'ballpoint' ? BALLPOINT_FRAGMENT_SHADER
+        : (options.inkVersion ?? ACTIVE_INK_VERSION) === 'current' ? INK_FRAGMENT_SHADER
+          : (options.inkVersion ?? ACTIVE_INK_VERSION) === 'v5' ? INK_V5_TONE_FRAGMENT
+            : (options.inkVersion ?? ACTIVE_INK_VERSION) === 'v4' ? INK_V4_TONE_FRAGMENT
+            : INK_TONE_FRAGMENT,
       side: options.side ?? THREE.FrontSide,
       transparent: opacity < 1,
       depthTest: options.depthTest ?? true,
@@ -291,6 +514,9 @@ export class DoodleMaterial extends THREE.ShaderMaterial {
       polygonOffsetFactor: options.polygonOffsetFactor ?? 0,
       polygonOffsetUnits: options.polygonOffsetUnits ?? 0,
     });
+    this.visualStyle = visualStyle;
+    this.isInkWashMaterial = visualStyle === 'ink';
+    Object.assign(this.uniforms, inkUniforms);
   }
 
   get surfaceColor(): THREE.Color {
@@ -320,6 +546,25 @@ export class DoodleMaterial extends THREE.ShaderMaterial {
   setHatch(scale: number, strength = this.uniforms.uHatchStrength.value): this {
     this.uniforms.uHatchScale.value = Math.max(scale, 2);
     this.uniforms.uHatchStrength.value = THREE.MathUtils.clamp(strength, 0, 1.5);
+    if (this.visualStyle === 'ink') {
+      this.uniforms.uWashStrength.value = THREE.MathUtils.clamp(strength, 0, 1.5);
+    }
+    return this;
+  }
+
+  setWash(
+    strength: number,
+    dryBrushStrength = this.uniforms.uDryBrushStrength.value,
+    granulationStrength = this.uniforms.uGranulationStrength.value,
+  ): this {
+    this.uniforms.uWashStrength.value = THREE.MathUtils.clamp(strength, 0, 1.5);
+    this.uniforms.uDryBrushStrength.value = THREE.MathUtils.clamp(dryBrushStrength, 0, 1);
+    this.uniforms.uGranulationStrength.value = THREE.MathUtils.clamp(granulationStrength, 0, 1);
+    return this;
+  }
+
+  setWashBias(value: number): this {
+    this.uniforms.uWashBias.value = THREE.MathUtils.clamp(value, 0, 0.5);
     return this;
   }
 

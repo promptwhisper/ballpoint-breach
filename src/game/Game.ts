@@ -32,6 +32,9 @@ import { GameState, type GameMode } from './GameState';
 import { GrappleSystem } from './GrappleSystem';
 import { SupplySystem, type SupplyPickupEvent } from './SupplySystem';
 import { createGameScene } from './createGameScene';
+import { InkOutline } from '../render/InkOutline';
+import { ACTIVE_INK_VERSION } from '../render/inkSettings';
+import { ACTIVE_VISUAL_STYLE } from '../render/visualStyle';
 
 const BASE_FOV = 68;
 const PLAYER_CENTER_HEIGHT = 0.95;
@@ -157,6 +160,8 @@ export class Game {
   private controlRequest = 0;
   private wasPointerLocked = false;
   private deathFlashTimeout: number | null = null;
+  private readonly inkOutline = ACTIVE_VISUAL_STYLE === 'ink' && ACTIVE_INK_VERSION !== 'current'
+    ? new InkOutline() : null;
 
   constructor(readonly canvas: HTMLCanvasElement, options: GameOptions = {}) {
     this.captureMode = options.capture ?? false;
@@ -184,6 +189,7 @@ export class Game {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.shadowMap.enabled = false;
+    this.renderer.info.autoReset = false;
 
     this.scene = createGameScene();
     this.camera = new THREE.PerspectiveCamera(BASE_FOV, 1, 0.025, 150);
@@ -311,7 +317,7 @@ export class Game {
     cancelAnimationFrame(this.requestId);
     if (this.deathFlashTimeout !== null) window.clearTimeout(this.deathFlashTimeout);
     document.body.classList.remove('death-hit');
-    this.hud.clearDamageFeedback();
+    this.hud.dispose();
     window.removeEventListener('resize', this.resize);
     document.removeEventListener('pointerlockchange', this.handlePointerLockChange);
     this.hud.startButton.removeEventListener('click', this.handleStartClick);
@@ -319,6 +325,7 @@ export class Game {
     this.overlay.removeEventListener('click', this.handleOverlayClick);
     this.input.dispose();
     this.arena.dispose();
+    this.inkOutline?.dispose();
     this.renderer.dispose();
   }
 
@@ -430,7 +437,7 @@ export class Game {
     this.qaDamageDemoConsumed = false;
     this.roundStarted = true;
     this.waves.start();
-    this.hud.showTip('Q grapples enemies and the blue-ink anchor points', 5.5);
+    this.hud.showTip('Q grapples enemies and the marked anchor points', 5.5);
     this.setMode('paused');
   }
 
@@ -798,7 +805,9 @@ export class Game {
     } else if (event.type === 'attack-telegraph') {
       this.effects.spawnBurst(event.position, 'red', event.kind === 'boss' ? 0.55 : 0.22, event.telegraphDuration ?? 0.35);
     } else if (event.type === 'projectile-impact') {
-      this.effects.spawnBurst(event.position, 'red', 0.13, 0.26);
+      if (ACTIVE_VISUAL_STYLE === 'ink') {
+        this.effects.spawnInkSplatter(event.position, event.direction ?? new THREE.Vector3(0, 1, 0), 'blue', 3);
+      } else this.effects.spawnBurst(event.position, 'red', 0.13, 0.26);
     } else if (event.type === 'boss-phase') {
       this.hud.showBanner('THE DOODLER', 'PHASE TWO · THE LINES GET ANGRY', 2.1);
       this.audio.play('boss');
@@ -1092,9 +1101,11 @@ export class Game {
   }
 
   private renderFrame(): void {
+    this.renderer.info.reset();
     this.renderer.autoClear = true;
     this.camera.layers.set(0);
-    this.renderer.render(this.scene, this.camera);
+    if (this.inkOutline) this.inkOutline.render(this.renderer, this.scene, this.camera);
+    else this.renderer.render(this.scene, this.camera);
     this.renderer.autoClear = false;
     this.renderer.clearDepth();
     this.camera.layers.set(1);
@@ -1116,6 +1127,6 @@ export class Game {
     const stage = document.querySelector<HTMLElement>('#stage');
     if (!stage) return;
     const wave = Math.max(1, this.waves.wave || this.state.wave);
-    stage.textContent = `WAVE ${wave} · ${Math.round(this.smoothedFps)} FPS · ${this.enemies.livingCount} ACTORS`;
+    stage.textContent = `第 ${wave} 阵 · ${Math.round(this.smoothedFps)} 帧／秒 · ${this.enemies.livingCount} 名敌人`;
   }
 }

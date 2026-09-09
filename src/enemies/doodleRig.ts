@@ -1,8 +1,12 @@
 import * as THREE from 'three';
-import { DoodleMaterial, DOODLE_PALETTE } from '../render';
+import { ACTIVE_VISUAL_STYLE, DoodleMaterial, DOODLE_PALETTE } from '../render';
 import type { EnemyHitZone, EnemyKind } from './types';
+import { ACTIVE_INK_VERSION } from '../render/inkSettings';
+import { getHeroInkTexture } from '../render/InkTextures';
 
-const COLORS = {
+const INK_STYLE = ACTIVE_VISUAL_STYLE === 'ink';
+
+const BALLPOINT_COLORS = {
   paper: 0xf0eae0,
   cream: 0xe8ded3,
   red: 0xcf3f5a,
@@ -11,52 +15,71 @@ const COLORS = {
   graphiteSoft: 0x555064,
 };
 
+const INK_COLORS = {
+  paper: 0x747672,
+  cream: 0x9b9991,
+  red: 0x9f4139,
+  redOutline: 0x171b1d,
+  graphite: 0x202426,
+  graphiteSoft: 0x555a59,
+};
+
+const COLORS = INK_STYLE ? INK_COLORS : BALLPOINT_COLORS;
+
+function makeRigMaterial(
+  surfaceColor: THREE.ColorRepresentation,
+  inkColor: THREE.ColorRepresentation,
+  hatchScale: number,
+  hatchStrength: number,
+  seed: number,
+  washStrength: number,
+  dryBrushStrength: number,
+  granulationStrength = 0.3,
+  washBias = 0,
+): DoodleMaterial {
+  return new DoodleMaterial({
+    surfaceColor,
+    paperColor: DOODLE_PALETTE.paper,
+    inkColor,
+    hatchScale,
+    hatchStrength,
+    seed,
+    ...(INK_STYLE ? {
+      shadowColor: 0x111416,
+      patternSpace: 'object' as const,
+      ...(ACTIVE_INK_VERSION === 'v5' ? {
+        inkBrushMap: getHeroInkTexture('npc'),
+      } : {}),
+      washStrength: ACTIVE_INK_VERSION === 'v5' ? washStrength * 0.78 : washStrength,
+      washBias: ACTIVE_INK_VERSION === 'v5' ? washBias * 0.45 : washBias,
+      dryBrushStrength,
+      granulationStrength,
+    } : {}),
+  });
+}
+
 const MATERIALS = {
-  paper: new DoodleMaterial({
-    surfaceColor: COLORS.paper,
-    paperColor: DOODLE_PALETTE.paper,
-    inkColor: COLORS.redOutline,
-    hatchScale: 8.2,
-    hatchStrength: 0.2,
-    seed: 21.1,
-  }),
-  cream: new DoodleMaterial({
-    surfaceColor: COLORS.cream,
-    paperColor: DOODLE_PALETTE.paper,
-    inkColor: COLORS.redOutline,
-    hatchScale: 8,
-    hatchStrength: 0.28,
-    seed: 22.3,
-  }),
-  red: new DoodleMaterial({
-    surfaceColor: COLORS.red,
-    paperColor: DOODLE_PALETTE.paper,
-    inkColor: COLORS.redOutline,
-    hatchScale: 7.5,
-    hatchStrength: 0.34,
-    seed: 23.7,
-  }),
-  graphite: new DoodleMaterial({
-    surfaceColor: COLORS.graphite,
-    paperColor: DOODLE_PALETTE.paper,
-    inkColor: COLORS.graphite,
-    hatchScale: 7.1,
-    hatchStrength: 0.38,
-    seed: 24.9,
-  }),
+  paper: makeRigMaterial(COLORS.paper, COLORS.redOutline, 8.2, 0.2, 21.1, 0.62, 0.16),
+  cream: makeRigMaterial(COLORS.cream, COLORS.redOutline, 8, 0.28, 22.3, 0.52, 0.13),
+  red: makeRigMaterial(COLORS.red, COLORS.redOutline, 7.5, 0.34, 23.7, 0.86, 0.2),
+  graphite: makeRigMaterial(COLORS.graphite, COLORS.graphite, 7.1, 0.38, 24.9, 1.06, 0.29),
+  enemyWash: makeRigMaterial(0x646a6a, COLORS.graphite, 7.7, 0.72, 25.7, 0.88, 0.24, 0.34, 0.22),
+  enemyInk: makeRigMaterial(0x383f41, COLORS.graphite, 7.2, 0.88, 26.3, 1.08, 0.34, 0.4, 0.34),
+  bossWash: makeRigMaterial(0x4b5253, COLORS.graphite, 7.4, 0.82, 27.1, 1.02, 0.29, 0.38, 0.28),
+  paperBreak: makeRigMaterial(DOODLE_PALETTE.paperLight, COLORS.graphiteSoft, 8.4, 0.08, 28.3, 0.12, 0.06, 0.12),
   faceInk: new THREE.MeshBasicMaterial({ color: COLORS.graphite }),
-  redFaceInk: new THREE.MeshBasicMaterial({ color: COLORS.redOutline }),
+  redFaceInk: new THREE.MeshBasicMaterial({ color: INK_STYLE ? COLORS.red : COLORS.redOutline }),
   redOutline: new THREE.LineBasicMaterial({ color: COLORS.redOutline, transparent: true, opacity: 0.98 }),
-  redEcho: new THREE.LineBasicMaterial({ color: COLORS.red, transparent: true, opacity: 0.42 }),
+  redEcho: new THREE.LineBasicMaterial({ color: INK_STYLE ? COLORS.graphiteSoft : COLORS.red, transparent: true, opacity: INK_STYLE ? 0.24 : 0.42 }),
   graphiteOutline: new THREE.LineBasicMaterial({ color: COLORS.graphite, transparent: true, opacity: 0.98 }),
-  graphiteEcho: new THREE.LineBasicMaterial({ color: COLORS.graphiteSoft, transparent: true, opacity: 0.34 }),
+  graphiteEcho: new THREE.LineBasicMaterial({ color: COLORS.graphiteSoft, transparent: true, opacity: INK_STYLE ? 0.22 : 0.34 }),
   redShell: new THREE.MeshBasicMaterial({ color: COLORS.redOutline, side: THREE.BackSide }),
-  redShellEcho: new THREE.MeshBasicMaterial({ color: COLORS.red, side: THREE.BackSide, transparent: true, opacity: 0.34 }),
+  redShellEcho: new THREE.MeshBasicMaterial({ color: INK_STYLE ? COLORS.graphiteSoft : COLORS.red, side: THREE.BackSide, transparent: true, opacity: INK_STYLE ? 0.2 : 0.34 }),
   graphiteShell: new THREE.MeshBasicMaterial({ color: COLORS.graphite, side: THREE.BackSide }),
-  graphiteShellEcho: new THREE.MeshBasicMaterial({ color: COLORS.graphiteSoft, side: THREE.BackSide, transparent: true, opacity: 0.3 }),
-  deathInk: new THREE.MeshBasicMaterial({ color: COLORS.red }),
-  deathInkShell: new THREE.MeshBasicMaterial({ color: COLORS.redOutline, side: THREE.BackSide }),
-  deathInkLine: new THREE.LineBasicMaterial({ color: COLORS.redOutline, transparent: true, opacity: 0.98 }),
+  graphiteShellEcho: new THREE.MeshBasicMaterial({ color: COLORS.graphiteSoft, side: THREE.BackSide, transparent: true, opacity: INK_STYLE ? 0.2 : 0.3 }),
+  deathInk: new THREE.MeshBasicMaterial({ color: INK_STYLE ? 0x252a2c : COLORS.red }),
+  deathInkShell: new THREE.MeshBasicMaterial({ color: INK_STYLE ? 0x141719 : COLORS.redOutline, side: THREE.BackSide }),
+  deathInkLine: new THREE.LineBasicMaterial({ color: INK_STYLE ? 0x141719 : COLORS.redOutline, transparent: true, opacity: 0.98 }),
 };
 
 const unitSphere = new THREE.SphereGeometry(1, 14, 10);
@@ -511,7 +534,7 @@ function addBrokenInkBands(segment: THREE.Mesh, name: string, variant: number, l
   const count = lower ? 2 : 1;
   for (let index = 0; index < count; index += 1) {
     const geometry = REGULAR_GEOMETRIES.prisms[(variant * 3 + index + (lower ? 5 : 0)) % REGULAR_GEOMETRIES.prisms.length] ?? GEOMETRIES.box;
-    const band = new THREE.Mesh(geometry, MATERIALS.paper);
+    const band = new THREE.Mesh(geometry, INK_STYLE ? MATERIALS.paperBreak : MATERIALS.paper);
     band.name = `${name}-paper-break-${index + 1}`;
     band.position.set(
       (hashUnit(variant, 30 + index) - 0.5) * 0.16,
@@ -532,7 +555,9 @@ function createLimb(options: LimbOptions): THREE.Group {
   pivot.name = `${name}-joint`;
   const outline = boss ? MATERIALS.graphiteOutline : MATERIALS.redOutline;
   const echo = boss ? MATERIALS.graphiteEcho : MATERIALS.redEcho;
-  const material = boss ? MATERIALS.paper : MATERIALS.red;
+  const material = boss
+    ? (INK_STYLE ? MATERIALS.bossWash : MATERIALS.paper)
+    : (INK_STYLE ? MATERIALS.enemyInk : MATERIALS.red);
   const upperBase = kind === 'arm' ? (boss ? 0.31 : 0.27) : (boss ? 0.36 : 0.34);
   const lowerBase = kind === 'arm' ? (boss ? 0.32 : 0.29) : (boss ? 0.39 : 0.38);
   const upperLength = upperBase * (boss ? 1 : 0.96 + hashUnit(variant, side === -1 ? 21 : 22) * 0.08);
@@ -601,7 +626,7 @@ function createLimb(options: LimbOptions): THREE.Group {
       geometry: boss
         ? GEOMETRIES.dodecahedron
         : REGULAR_GEOMETRIES.mittens[(variant * 2 + (side === 1 ? 1 : 0)) % REGULAR_GEOMETRIES.mittens.length] ?? GEOMETRIES.sphereLow,
-      material: MATERIALS.paper,
+      material: INK_STYLE ? (boss ? MATERIALS.bossWash : MATERIALS.enemyWash) : MATERIALS.paper,
       outline,
       echoOutline: echo,
       position: [
@@ -625,7 +650,7 @@ function createLimb(options: LimbOptions): THREE.Group {
       geometry: boss
         ? GEOMETRIES.dodecahedron
         : REGULAR_GEOMETRIES.blobs[(variant * 5 + (side === 1 ? 13 : 6)) % REGULAR_GEOMETRIES.blobs.length] ?? GEOMETRIES.dodecahedron,
-      material: MATERIALS.paper,
+      material: INK_STYLE ? (boss ? MATERIALS.bossWash : MATERIALS.enemyWash) : MATERIALS.paper,
       outline,
       echoOutline: echo,
       position: [side * (boss ? 0.012 : 0.018), -lowerLength - 0.055, 0.075],
@@ -664,7 +689,7 @@ function addUprightGun(rig: DoodleRig, kind: EnemyKind, variant: number): void {
   addOutlinedPart(weapon, {
     name: `${kind}-weapon-lower-grip`,
     geometry: REGULAR_GEOMETRIES.prisms[(variant * 3 + 5) % REGULAR_GEOMETRIES.prisms.length] ?? GEOMETRIES.box,
-    material: MATERIALS.paper,
+    material: INK_STYLE ? MATERIALS.enemyWash : MATERIALS.paper,
     position: [0.022, -0.31, 0.006],
     rotation: [0, 0, -0.12],
     scale: [0.057 * widthScale, 0.22, 0.058 * widthScale],
@@ -707,7 +732,7 @@ function createRegularRig(kind: EnemyKind, seed: number): DoodleRig {
   addHitPart(torsoDrawing, {
     name: 'torso-hit-zone',
     geometry: REGULAR_GEOMETRIES.torsos[variant] ?? GEOMETRIES.sphere,
-    material: MATERIALS.paper,
+    material: INK_STYLE ? MATERIALS.enemyWash : MATERIALS.paper,
     scale: [0.35, 0.32, 0.165],
   }, 'torso', hitMeshes);
   addScribbleContour(torsoDrawing, 'regular-torso-scribble-contour', 0.349, 0.319, 0.071, 610 + variant);
@@ -724,7 +749,7 @@ function createRegularRig(kind: EnemyKind, seed: number): DoodleRig {
   addHitPart(headDrawing, {
     name: 'head-hit-zone',
     geometry: REGULAR_GEOMETRIES.heads[variant] ?? GEOMETRIES.sphere,
-    material: MATERIALS.paper,
+    material: INK_STYLE ? MATERIALS.enemyWash : MATERIALS.paper,
     scale: [0.3, 0.31, 0.145],
   }, 'head', hitMeshes);
   addScribbleContour(headDrawing, 'regular-head-scribble-contour', 0.299, 0.309, 0.068, 710 + variant);
@@ -787,7 +812,7 @@ function createBossRig(): DoodleRig {
   addHitPart(torso, {
     name: 'boss-torso-hit-zone',
     geometry: GEOMETRIES.sphere,
-    material: MATERIALS.paper,
+    material: INK_STYLE ? MATERIALS.bossWash : MATERIALS.paper,
     outline: MATERIALS.graphiteOutline,
     echoOutline: MATERIALS.graphiteEcho,
     scale: [0.55, 0.37, 0.38],
@@ -800,7 +825,7 @@ function createBossRig(): DoodleRig {
   addHitPart(head, {
     name: 'boss-head-hit-zone',
     geometry: GEOMETRIES.sphere,
-    material: MATERIALS.paper,
+    material: INK_STYLE ? MATERIALS.bossWash : MATERIALS.paper,
     outline: MATERIALS.graphiteOutline,
     echoOutline: MATERIALS.graphiteEcho,
     scale: [0.44, 0.45, 0.33],

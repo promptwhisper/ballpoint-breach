@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { ACTIVE_VISUAL_STYLE } from '../render';
+
+const INK_STYLE = ACTIVE_VISUAL_STYLE === 'ink';
 
 interface SpriteSlot {
   sprite: THREE.Sprite;
@@ -96,6 +99,16 @@ export type FirearmEffectWeapon = 'rifle' | 'shotgun' | 'revolver' | 'sniper';
 type GoreShape = 'blob' | 'limb' | 'stroke' | 'drop';
 type SplatTextureKind = 'wall-impact' | 'wall-drip' | 'floor-pool' | 'floor-streak' | 'droplet';
 
+const GRAPPLE_DASH_WINDOWS = Object.freeze([
+  [0, 0.12],
+  [0.17, 0.27],
+  [0.32, 0.43],
+  [0.48, 0.58],
+  [0.63, 0.73],
+  [0.78, 0.87],
+  [0.92, 1],
+] as const);
+
 /** Reference-measured composition targets used by both the renderer and tests. */
 export const DEATH_INK_STYLE = Object.freeze({
   wallImpactLayers: 2,
@@ -135,12 +148,41 @@ interface DeathPieceSpec {
   face?: boolean;
 }
 
-const COLORS: Record<InkColor, number> = {
+const BALLPOINT_COLORS: Record<InkColor, number> = {
   blue: 0x27348f,
   red: 0xd03e5a,
   orange: 0xe79a32,
   green: 0x69b887,
 };
+
+const INK_COLORS: Record<InkColor, number> = {
+  blue: 0x20282d,
+  red: 0x9f4139,
+  orange: 0xb67243,
+  green: 0x526b70,
+};
+
+const COLORS = INK_STYLE ? INK_COLORS : BALLPOINT_COLORS;
+
+const DEATH_INK_COLORS = Object.freeze({
+  dark: 0x171b1d,
+  middle: 0x343a3c,
+  light: 0x555a59,
+  accent: 0x873a34,
+});
+
+function deathPieceColor(index: number, sequence: number): number {
+  if ((index + sequence * 5) % 13 === 0) return DEATH_INK_COLORS.accent;
+  if ((index + sequence) % 5 === 0) return DEATH_INK_COLORS.middle;
+  return DEATH_INK_COLORS.dark;
+}
+
+function deathDecalColor(kind: SplatTextureKind, opacity: number, cursor: number, sequence: number): number {
+  if (kind === 'droplet' && (cursor + sequence * 3) % 11 === 0) return DEATH_INK_COLORS.accent;
+  if (opacity < 0.62) return DEATH_INK_COLORS.light;
+  if (opacity < 0.82) return DEATH_INK_COLORS.middle;
+  return DEATH_INK_COLORS.dark;
+}
 
 const FIREARM_AFTERMATH: Readonly<Record<FirearmEffectWeapon, FirearmAftermathProfile>> = Object.freeze({
   rifle: Object.freeze({
@@ -215,29 +257,74 @@ function makeBurstTexture(): THREE.CanvasTexture {
   canvas.width = canvas.height = 128;
   const context = canvas.getContext('2d');
   if (!context) throw new Error('2D canvas is unavailable');
-  context.translate(64, 64);
-  context.fillStyle = '#ffffff';
-  context.beginPath();
-  const points = 26;
-  for (let index = 0; index <= points; index += 1) {
-    const angle = (index / points) * Math.PI * 2;
-    const radius = index % 2 === 0 ? 44 : 21 + ((index * 17) % 13);
-    const x = Math.cos(angle) * radius;
-    const y = Math.sin(angle) * radius;
-    if (index === 0) context.moveTo(x, y);
-    else context.lineTo(x, y);
-  }
-  context.closePath();
-  context.fill();
-  for (let index = 0; index < 11; index += 1) {
-    const angle = index * 2.399;
-    const radius = 45 + (index % 3) * 8;
+  if (INK_STYLE) {
+    context.fillStyle = '#ffffff';
+    drawRaggedIsland(context, 811, 63, 64, 36, 31, 0.92);
+    drawRaggedIsland(context, 823, 80, 57, 21, 15, 0.64);
+    drawTaperedStroke(context, 54, 65, 113, 42, 7.5, 0.6, -8, 0.74);
+    drawTaperedStroke(context, 61, 70, 104, 91, 5.2, 0.4, 6, 0.58);
+    for (let index = 0; index < 9; index += 1) {
+      const angle = index * 2.399 + 0.3;
+      const radius = 42 + deterministic(index, 827) * 16;
+      drawDroplet(
+        context,
+        64 + Math.cos(angle) * radius,
+        64 + Math.sin(angle) * radius,
+        1.5 + deterministic(index, 829) * 3.3,
+        1.2,
+        angle,
+        0.48 + deterministic(index, 839) * 0.38,
+      );
+    }
+    cutDryBrushGaps(context, 853, 65, 64, 74, 58, 17);
+  } else {
+    context.translate(64, 64);
+    context.fillStyle = '#ffffff';
     context.beginPath();
-    context.arc(Math.cos(angle) * radius, Math.sin(angle) * radius, 2 + (index % 4), 0, Math.PI * 2);
+    const points = 26;
+    for (let index = 0; index <= points; index += 1) {
+      const angle = (index / points) * Math.PI * 2;
+      const radius = index % 2 === 0 ? 44 : 21 + ((index * 17) % 13);
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius;
+      if (index === 0) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    }
+    context.closePath();
     context.fill();
+    for (let index = 0; index < 11; index += 1) {
+      const angle = index * 2.399;
+      const radius = 45 + (index % 3) * 8;
+      context.beginPath();
+      context.arc(Math.cos(angle) * radius, Math.sin(angle) * radius, 2 + (index % 4), 0, Math.PI * 2);
+      context.fill();
+    }
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function makeMuzzleTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 128;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('2D canvas is unavailable');
+  context.fillStyle = '#171b1d';
+  drawRaggedIsland(context, 907, 65, 64, 31, 24, 0.94);
+  drawTaperedStroke(context, 57, 64, 119, 37, 9.5, 0.3, -7, 0.9);
+  drawTaperedStroke(context, 57, 65, 116, 84, 7.5, 0.25, 8, 0.82);
+  drawTaperedStroke(context, 55, 63, 101, 17, 5.2, 0.2, -5, 0.58);
+  context.fillStyle = '#c39052';
+  drawRaggedIsland(context, 919, 61, 64, 22, 17, 0.88);
+  drawTaperedStroke(context, 62, 63, 102, 51, 5.8, 0.2, -3, 0.64);
+  context.fillStyle = '#984138';
+  drawRaggedIsland(context, 929, 55, 65, 11, 10, 0.82);
+  cutDryBrushGaps(context, 937, 76, 63, 78, 54, 19);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
   return texture;
 }
 
@@ -247,29 +334,37 @@ function makeSmokeTexture(): THREE.CanvasTexture {
   const context = canvas.getContext('2d');
   if (!context) throw new Error('2D canvas is unavailable');
   context.clearRect(0, 0, 128, 128);
-  context.fillStyle = '#f4f0e8';
-  context.strokeStyle = '#403372';
-  context.lineWidth = 3.2;
-  const puffs = [
-    [48, 69, 24],
-    [74, 55, 27],
-    [82, 79, 22],
-  ] as const;
-  for (const [x, y, radius] of puffs) {
-    context.beginPath();
-    context.arc(x, y, radius, 0, Math.PI * 2);
-    context.fill();
-    context.stroke();
+  if (INK_STYLE) {
+    context.fillStyle = '#8f908b';
+    drawRaggedIsland(context, 947, 52, 72, 27, 22, 0.2);
+    drawRaggedIsland(context, 953, 75, 54, 31, 27, 0.16);
+    drawRaggedIsland(context, 967, 84, 79, 24, 20, 0.12);
+    cutDryBrushGaps(context, 971, 68, 66, 74, 60, 14);
+  } else {
+    context.fillStyle = '#f4f0e8';
+    context.strokeStyle = '#403372';
+    context.lineWidth = 3.2;
+    const puffs = [
+      [48, 69, 24],
+      [74, 55, 27],
+      [82, 79, 22],
+    ] as const;
+    for (const [x, y, radius] of puffs) {
+      context.beginPath();
+      context.arc(x, y, radius, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+    }
+    context.globalAlpha = 0.24;
+    context.lineWidth = 1.2;
+    for (let offset = 28; offset < 104; offset += 9) {
+      context.beginPath();
+      context.moveTo(offset - 22, 102);
+      context.lineTo(offset + 32, 34);
+      context.stroke();
+    }
+    context.globalAlpha = 1;
   }
-  context.globalAlpha = 0.24;
-  context.lineWidth = 1.2;
-  for (let offset = 28; offset < 104; offset += 9) {
-    context.beginPath();
-    context.moveTo(offset - 22, 102);
-    context.lineTo(offset + 32, 34);
-    context.stroke();
-  }
-  context.globalAlpha = 1;
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
@@ -509,7 +604,7 @@ function createFragmentFace(): THREE.Group {
   group.name = 'death-fragment-face';
   group.visible = false;
   const geometry = new THREE.BoxGeometry(1, 1, 1);
-  const material = new THREE.MeshBasicMaterial({ color: 0x3c2634 });
+  const material = new THREE.MeshBasicMaterial({ color: INK_STYLE ? DEATH_INK_COLORS.dark : 0x3c2634 });
   for (const side of [-1, 1]) {
     const eye = new THREE.Mesh(geometry, material);
     eye.position.set(side * 0.082, 0.052, 0.225);
@@ -588,6 +683,8 @@ export class EffectPool {
   private readonly decalSlots: DecalSlot[] = [];
   private readonly pendingSplats: PendingSplat[] = [];
   private readonly pendingCasings: PendingCasing[] = [];
+  private readonly burstTexture: THREE.CanvasTexture;
+  private readonly muzzleTexture: THREE.CanvasTexture;
   private readonly splatTextures: Readonly<Record<SplatTextureKind, readonly THREE.CanvasTexture[]>> = {
     'wall-impact': [0, 1, 2, 3].map((seed) => makeSplatTexture(seed, 'wall-impact')),
     'wall-drip': [0, 1, 2, 3].map((seed) => makeSplatTexture(seed, 'wall-drip')),
@@ -608,9 +705,9 @@ export class EffectPool {
   private goreCursor = 0;
   private decalCursor = 0;
   private deathSequence = 0;
-  private readonly grapplePositions = new Float32Array(6);
+  private readonly grapplePositions = new Float32Array(GRAPPLE_DASH_WINDOWS.length * 6);
   private readonly grappleGeometry = new THREE.BufferGeometry();
-  private readonly grappleLine: THREE.Line;
+  private readonly grappleLine: THREE.LineSegments;
 
   constructor(
     scene: THREE.Scene,
@@ -623,9 +720,10 @@ export class EffectPool {
   ) {
     this.root.name = 'pooled-effects';
     scene.add(this.root);
-    const burstTexture = makeBurstTexture();
+    this.burstTexture = makeBurstTexture();
+    this.muzzleTexture = makeMuzzleTexture();
     for (let index = 0; index < spriteCapacity; index += 1) {
-      const material = new THREE.SpriteMaterial({ map: burstTexture, color: COLORS.blue, transparent: true, opacity: 0, depthWrite: false });
+      const material = new THREE.SpriteMaterial({ map: this.burstTexture, color: COLORS.blue, transparent: true, opacity: 0, depthWrite: false });
       const sprite = new THREE.Sprite(material);
       sprite.visible = false;
       sprite.renderOrder = 7;
@@ -643,8 +741,8 @@ export class EffectPool {
 
     const casingGeometry = new THREE.BoxGeometry(1, 1, 1);
     const casingEdges = new THREE.EdgesGeometry(casingGeometry, 12);
-    const casingMaterial = new THREE.MeshBasicMaterial({ color: COLORS.orange });
-    const casingOutline = new THREE.LineBasicMaterial({ color: 0x403372, transparent: true, opacity: 0.92 });
+    const casingMaterial = new THREE.MeshBasicMaterial({ color: INK_STYLE ? 0x655b4e : COLORS.orange });
+    const casingOutline = new THREE.LineBasicMaterial({ color: INK_STYLE ? 0x202426 : 0x403372, transparent: true, opacity: 0.92 });
     for (let index = 0; index < casingCapacity; index += 1) {
       const object = new THREE.Group();
       object.name = `ejected-casing-${index}`;
@@ -696,7 +794,7 @@ export class EffectPool {
     }
 
     for (let index = 0; index < goreCapacity; index += 1) {
-      const mesh = new THREE.Mesh(this.goreGeometries.drop, new THREE.MeshBasicMaterial({ color: COLORS.red }));
+      const mesh = new THREE.Mesh(this.goreGeometries.drop, new THREE.MeshBasicMaterial({ color: INK_STYLE ? DEATH_INK_COLORS.dark : COLORS.red }));
       const face = createFragmentFace();
       mesh.add(face);
       mesh.visible = false;
@@ -720,7 +818,7 @@ export class EffectPool {
     for (let index = 0; index < decalCapacity; index += 1) {
       const material = new THREE.MeshBasicMaterial({
         map: this.splatTextures['floor-pool'][index % DEATH_INK_STYLE.textureVariants],
-        color: COLORS.red,
+        color: INK_STYLE ? DEATH_INK_COLORS.dark : COLORS.red,
         transparent: true,
         opacity: 0,
         alphaTest: 0.035,
@@ -738,7 +836,12 @@ export class EffectPool {
     }
 
     this.grappleGeometry.setAttribute('position', new THREE.BufferAttribute(this.grapplePositions, 3));
-    this.grappleLine = new THREE.Line(this.grappleGeometry, new THREE.LineBasicMaterial({ color: COLORS.blue, transparent: true, opacity: 0.96 }));
+    this.grappleGeometry.setDrawRange(0, INK_STYLE ? GRAPPLE_DASH_WINDOWS.length * 2 : 2);
+    this.grappleLine = new THREE.LineSegments(this.grappleGeometry, new THREE.LineBasicMaterial({
+      color: INK_STYLE ? 0x1c252a : COLORS.blue,
+      transparent: true,
+      opacity: INK_STYLE ? 0.88 : 0.96,
+    }));
     this.grappleLine.visible = false;
     this.grappleLine.frustumCulled = false;
     this.grappleLine.renderOrder = 10;
@@ -751,7 +854,9 @@ export class EffectPool {
     slot.life = slot.maxLife = lifetime;
     slot.sprite.position.copy(position);
     slot.sprite.scale.setScalar(scale);
-    slot.material.color.setHex(COLORS[color]);
+    const muzzleBurst = INK_STYLE && color === 'orange' && lifetime <= 0.11;
+    slot.material.map = muzzleBurst ? this.muzzleTexture : this.burstTexture;
+    slot.material.color.setHex(muzzleBurst ? 0xffffff : COLORS[color]);
     slot.material.opacity = 0.95;
     slot.sprite.visible = true;
   }
@@ -1017,7 +1122,9 @@ export class EffectPool {
     slot.mesh.scale.set(Math.max(0.025, width), Math.max(0.025, height), 1);
     const textures = this.splatTextures[textureKind];
     slot.material.map = textures[(this.decalCursor + this.deathSequence) % textures.length];
-    slot.material.color.setHex(COLORS.red);
+    slot.material.color.setHex(INK_STYLE
+      ? deathDecalColor(textureKind, opacity, this.decalCursor, this.deathSequence)
+      : COLORS.red);
     slot.baseOpacity = THREE.MathUtils.clamp(opacity, DEATH_INK_STYLE.opacityRange[0], DEATH_INK_STYLE.opacityRange[1]);
     slot.material.opacity = slot.baseOpacity;
   }
@@ -1081,7 +1188,7 @@ export class EffectPool {
         { ...piece, life: piece.life * (violentSeparation ? 0.72 : 0.38) },
         intensity * semanticMotion,
         bodyScale,
-        color,
+        INK_STYLE ? deathPieceColor(index, this.deathSequence) : color,
       );
     });
 
@@ -1099,7 +1206,7 @@ export class EffectPool {
         delay: 0.025 + (index % 4) * 0.004,
         life: 0.56 + deterministic(index, 23) * 0.38,
         bounce: 0.08,
-      }, intensity * sprayMotion, bodyScale, color);
+      }, intensity * sprayMotion, bodyScale, INK_STYLE ? deathPieceColor(sequenceIndex, this.deathSequence) : color);
     }
 
     const dropCount = options.boss ? 32 : options.headshot ? 28 : 24;
@@ -1116,7 +1223,7 @@ export class EffectPool {
         delay: 0.025 + (index % 6) * 0.003,
         life: 0.62 + deterministic(index, 61) * 0.52,
         bounce: 0.12,
-      }, intensity * sprayMotion, bodyScale, color);
+      }, intensity * sprayMotion, bodyScale, INK_STYLE ? deathPieceColor(sequenceIndex, this.deathSequence) : color);
     }
 
     const floorNormal = new THREE.Vector3(0, 1, 0);
@@ -1241,12 +1348,28 @@ export class EffectPool {
   setGrapple(start: THREE.Vector3, end: THREE.Vector3, visible: boolean): void {
     this.grappleLine.visible = visible;
     if (!visible) return;
-    this.grapplePositions[0] = start.x;
-    this.grapplePositions[1] = start.y;
-    this.grapplePositions[2] = start.z;
-    this.grapplePositions[3] = end.x;
-    this.grapplePositions[4] = end.y;
-    this.grapplePositions[5] = end.z;
+    if (INK_STYLE) {
+      const deltaX = end.x - start.x;
+      const deltaY = end.y - start.y;
+      const deltaZ = end.z - start.z;
+      for (let index = 0; index < GRAPPLE_DASH_WINDOWS.length; index += 1) {
+        const window = GRAPPLE_DASH_WINDOWS[index];
+        const offset = index * 6;
+        this.grapplePositions[offset] = start.x + deltaX * window[0];
+        this.grapplePositions[offset + 1] = start.y + deltaY * window[0];
+        this.grapplePositions[offset + 2] = start.z + deltaZ * window[0];
+        this.grapplePositions[offset + 3] = start.x + deltaX * window[1];
+        this.grapplePositions[offset + 4] = start.y + deltaY * window[1];
+        this.grapplePositions[offset + 5] = start.z + deltaZ * window[1];
+      }
+    } else {
+      this.grapplePositions[0] = start.x;
+      this.grapplePositions[1] = start.y;
+      this.grapplePositions[2] = start.z;
+      this.grapplePositions[3] = end.x;
+      this.grapplePositions[4] = end.y;
+      this.grapplePositions[5] = end.z;
+    }
     (this.grappleGeometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
   }
 

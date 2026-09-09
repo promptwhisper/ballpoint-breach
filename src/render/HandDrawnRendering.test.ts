@@ -7,6 +7,20 @@ import {
   createOutlinedMesh,
   getOutlineCacheStats,
 } from './OutlinedMesh';
+import { BALLPOINT_PALETTE, DOODLE_PALETTE, INK_PALETTE } from './palette';
+import { ACTIVE_VISUAL_STYLE, isInkStyle, resolveVisualStyle } from './visualStyle';
+
+test('visual style resolution is pure, Node-safe, and defaults to ink', () => {
+  assert.equal(resolveVisualStyle('?style=ballpoint'), 'ballpoint');
+  assert.equal(resolveVisualStyle('?capture=1&style=ballpoint&view=rear'), 'ballpoint');
+  assert.equal(resolveVisualStyle('?style=ink'), 'ink');
+  assert.equal(resolveVisualStyle('?style=unknown'), 'ink');
+  assert.equal(resolveVisualStyle(''), 'ink');
+  assert.equal(ACTIVE_VISUAL_STYLE, 'ink');
+  assert.equal(isInkStyle(), true);
+  assert.equal(DOODLE_PALETTE, INK_PALETTE);
+  assert.notEqual(INK_PALETTE.ink, BALLPOINT_PALETTE.ink);
+});
 
 test('hand-drawn edges subdivide straight topology and pack a pale broken second pass', () => {
   const source = new THREE.BoxGeometry(4, 2, 1);
@@ -19,6 +33,7 @@ test('hand-drawn edges subdivide straight topology and pack a pale broken second
     doubleStroke: true,
     doubleStrokeOffset: 0.008,
     ghostOpacity: 0.34,
+    visualStyle: 'ballpoint',
   });
   try {
     const positions = drawn.getAttribute('position');
@@ -33,6 +48,60 @@ test('hand-drawn edges subdivide straight topology and pack a pale broken second
   } finally {
     drawn.dispose();
     exact.dispose();
+    source.dispose();
+  }
+});
+
+test('ink outlines vary pressure and leave sparse gaps in the same line geometry', () => {
+  const source = new THREE.BoxGeometry(6, 3, 2);
+  const common = {
+    thresholdAngle: 20,
+    irregularity: 0.01,
+    seed: 18.7,
+    segmentLength: 0.18,
+    doubleStroke: true,
+    doubleStrokeOffset: 0.006,
+  } as const;
+  const ballpoint = createHandDrawnEdgesGeometry(source, {
+    ...common,
+    visualStyle: 'ballpoint',
+    ghostOpacity: 0.34,
+  });
+  const ink = createHandDrawnEdgesGeometry(source, {
+    ...common,
+    visualStyle: 'ink',
+    ghostOpacity: 0.16,
+    primaryOpacityVariation: 0.42,
+    primaryBreakup: 0.2,
+  });
+  const inkAgain = createHandDrawnEdgesGeometry(source, {
+    ...common,
+    visualStyle: 'ink',
+    ghostOpacity: 0.16,
+    primaryOpacityVariation: 0.42,
+    primaryBreakup: 0.2,
+  });
+  try {
+    const colors = ink.getAttribute('color');
+    const alphas = Array.from({ length: colors.count }, (_, index) => colors.getW(index));
+    assert.ok(alphas.some((alpha) => alpha > 0.58 && alpha < 0.99), 'primary brush pressure should vary');
+    assert.ok(alphas.some((alpha) => Math.abs(alpha - 0.16) < 1e-6), 'ink keeps a faint sparse echo');
+    assert.ok(
+      ink.getAttribute('position').count < ballpoint.getAttribute('position').count,
+      'ink pressure gaps and sparse echoes should reduce packed segments',
+    );
+    assert.deepEqual(
+      Array.from(inkAgain.getAttribute('position').array),
+      Array.from(ink.getAttribute('position').array),
+    );
+    assert.deepEqual(
+      Array.from(inkAgain.getAttribute('color').array),
+      Array.from(ink.getAttribute('color').array),
+    );
+  } finally {
+    ballpoint.dispose();
+    ink.dispose();
+    inkAgain.dispose();
     source.dispose();
   }
 });
@@ -86,6 +155,7 @@ test('outlined meshes reuse one RGBA line pass and release cached resources', ()
 
 test('doodle material exposes bounded variation, angle, and paper grain controls', () => {
   const material = new DoodleMaterial({
+    visualStyle: 'ballpoint',
     hatchAngle: 0.18,
     hatchVariation: 2,
     grainStrength: -1,
@@ -95,7 +165,50 @@ test('doodle material exposes bounded variation, angle, and paper grain controls
     assert.equal(material.uniforms.uHatchVariation.value, 1.5);
     assert.equal(material.uniforms.uGrainStrength.value, 0);
     assert.ok(Number.isFinite(material.uniforms.uSeedTurn.value));
+    assert.equal(material.visualStyle, 'ballpoint');
+    assert.equal(material.surfaceColor.getHex(), BALLPOINT_PALETTE.paperLight);
+    assert.equal(material.inkColor.getHex(), BALLPOINT_PALETTE.ink);
+    assert.match(material.fragmentShader, /strokeA/);
+    assert.match(material.fragmentShader, /gl_FragCoord/);
   } finally {
     material.dispose();
+  }
+});
+
+test('ink material exposes bounded wash controls and surface-stable pattern spaces', () => {
+  const worldMaterial = new DoodleMaterial({
+    visualStyle: 'ink',
+    patternSpace: 'world',
+    washBias: 4,
+    washStrength: 9,
+    washContrast: -2,
+    absorptionScale: 0,
+    dryBrushStrength: -1,
+    granulationStrength: 4,
+  });
+  const movingMaterial = new DoodleMaterial({ visualStyle: 'ink' });
+  try {
+    assert.equal(worldMaterial.visualStyle, 'ink');
+    assert.equal(worldMaterial.isInkWashMaterial, true);
+    assert.equal(worldMaterial.surfaceColor.getHex(), INK_PALETTE.paperLight);
+    assert.equal(worldMaterial.inkColor.getHex(), INK_PALETTE.ink);
+    assert.equal(worldMaterial.uniforms.uPatternSpace.value, 1);
+    assert.equal(movingMaterial.uniforms.uPatternSpace.value, 0);
+    assert.equal(worldMaterial.uniforms.uWashBias.value, 0.5);
+    assert.equal(movingMaterial.uniforms.uWashBias.value, 0);
+    assert.equal(worldMaterial.uniforms.uWashStrength.value, 1.5);
+    assert.equal(worldMaterial.uniforms.uWashContrast.value, 0.25);
+    assert.equal(worldMaterial.uniforms.uAbsorptionScale.value, 0.04);
+    assert.equal(worldMaterial.uniforms.uDryBrushStrength.value, 0);
+    assert.equal(worldMaterial.uniforms.uGranulationStrength.value, 1);
+    assert.match(worldMaterial.fragmentShader, /brokenShade/);
+    assert.match(worldMaterial.fragmentShader, /paperBreak/);
+    assert.doesNotMatch(worldMaterial.fragmentShader, /gl_FragCoord/);
+    assert.doesNotMatch(worldMaterial.fragmentShader, /uTime/);
+    worldMaterial.setWashBias(-1);
+    assert.equal(worldMaterial.uniforms.uWashBias.value, 0);
+  } finally {
+    worldMaterial.dispose();
+    movingMaterial.dispose();
   }
 });

@@ -25,7 +25,10 @@ npm install
 npm run dev
 ```
 
-Open `http://127.0.0.1:8901`. The development server intentionally uses port 8901.
+Open `http://127.0.0.1:8901`. The development server intentionally uses port 8901. The default visual style is the Chinese ink-wash treatment. Use these URLs for a direct A/B comparison:
+
+- `http://127.0.0.1:8901/?style=ink` - rice paper, ink washes, dry-brush breakup, and cinnabar accents;
+- `http://127.0.0.1:8901/?style=ballpoint` - the original ruled-notebook and indigo cross-hatch treatment.
 
 Production verification:
 
@@ -50,7 +53,7 @@ npm run build
 | Q | Grapple an enemy or anchor |
 | Escape | Release pointer and pause |
 
-Click **CLICK TO ENTER THE PAGE** to acquire pointer lock. A paused game resumes when the page is clicked again.
+Click the start button to acquire pointer lock. A paused game resumes when the arena is clicked again.
 If the browser rejects Pointer Lock, the game automatically continues in unlocked fallback mode: move the cursor to look, use the same keyboard/mouse controls, and press Escape to pause.
 
 ## Game loop
@@ -67,12 +70,12 @@ The arsenal contains:
 - a five-round bolt-action sniper with a circular scope;
 - a katana with an arc slash, finite block stamina, and timed projectile returns.
 
-Q fires a bounded blue line. Enemy hits pull the target toward the player; designated arena anchors lightly pull the player. World ray tests prevent grapples and gunfire from passing through walls.
+Q fires a bounded grapple line: dark ink in the ink-wash style and blue in the original ballpoint style. Enemy hits pull the target toward the player; designated arena anchors lightly pull the player. World ray tests prevent grapples and gunfire from passing through walls.
 
 ## Architecture
 
 - `src/game/` owns the main loop, state, world queries, supplies, and grapple integration.
-- `src/render/` contains the shared cross-hatch shader and cached outline helper.
+- `src/render/` contains the selectable ballpoint and ink-wash materials, shared palettes, and cached outline helper.
 - `src/level/` procedurally assembles the construction arena, colliders, waypoint graph, ledges, supplies, grapple anchors, and breakables.
 - `src/player/` and `src/physics/` implement the kinematic capsule controller.
 - `src/combat/` contains weapon definitions, state machines, and procedural viewmodels.
@@ -82,9 +85,11 @@ Q fires a bounded blue line. Enemy hits pull the target toward the player; desig
 
 The host keeps simulation and visuals separate: weapons emit hitscan/melee requests, enemies emit attacks and lifecycle events, and `Game` resolves those requests against the shared arena queries.
 
-## Notebook rendering
+## Rendering styles
 
-The cream paper, blue horizontal rules, red margin, and subtle grain are screen-space CSS layers and therefore remain fixed while the camera moves. Geometry uses a shared indigo outline cache plus a custom `DoodleMaterial`:
+Both styles preserve the same arena, weapons, enemies, collision, navigation, and gameplay. The `style` URL parameter only selects a rendering language when the page loads.
+
+The original ballpoint branch keeps its cream paper, blue horizontal rules, red margin, and subtle screen-space grain. Geometry uses a shared indigo outline cache plus the original `DoodleMaterial`:
 
 1. `dot(normal, lightDirection)` produces a stable light value.
 2. The value is quantized into four tonal bands.
@@ -94,11 +99,20 @@ The cream paper, blue horizontal rules, red margin, and subtle grain are screen-
 
 Visible mesh edges are subdivided once into deterministic wobbled primary strokes and intermittent, faint displaced pen passes. The duplicate pass is stored in the same line geometry, so the hand-traced look does not add a second draw call per object.
 
-The arena uses cream/lavender paper surfaces, enemies and damage use red ink, construction and breakables use orange, and supplies use green. Viewmodels render on a dedicated camera layer so they preserve self-occlusion without disappearing into nearby world geometry.
+The default ink-wash branch replaces the ruled notebook layer with warm rice paper and very subtle fixed fibres. Its shader builds form with continuous pale-to-dark ink washes, world-space absorption breakup, pigment granulation, and sparse dry-brush gaps rather than cross-hatch density. Charcoal and gray ink carry most of the image; dark indigo supports interactive readability and muted cinnabar is reserved for enemies, danger, and critical feedback.
+
+Viewmodels render on a dedicated camera layer in both styles, so they preserve self-occlusion without disappearing into nearby world geometry. All procedural variation is deterministic and contains no time-varying noise.
 
 ## QA modes
 
 `?capture=1` starts an unlocked, deterministic visual-review run. `?capture=1&stress=1` adds 20 active enemies for a bounded performance check. `?capture=1&ink=1` triggers a deterministic reference-style death after the opening banner for multi-timepoint visual review. `?capture=1&view=rear` and `view=west` expose the remote routes for multi-view geometry review. These modes do not replace the normal pointer-lock game.
+
+Style and QA parameters compose, so matching before/after captures can use:
+
+- `?capture=1&style=ink` and `?capture=1&style=ballpoint` for the core view;
+- `?capture=1&style=ink&view=rear` and `?capture=1&style=ink&view=west` for distant architecture and fog;
+- `?capture=1&style=ink&stress=1` for enemy readability and bounded performance;
+- `?capture=1&style=ink&ink=1` for the integrated death-ink wall and floor composition.
 
 ## Project documents
 
@@ -107,6 +121,7 @@ The arena uses cream/lavender paper surfaces, enemies and damage use red ink, co
 - [Layout contract](layout-contract.md)
 - [Acceptance contract](ACCEPTANCE.md)
 - [Fidelity self-review](self-review.md)
+- [Ink typography system](docs/typography.md)
 - [Permanent user feedback signals](user-signals.md)
 
 ## License and attribution

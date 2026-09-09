@@ -1,6 +1,31 @@
 @import '@fontsource/patrick-hand';
 
-:root{font-family:'Patrick Hand','Chalkboard SE','Comic Sans MS',cursive;color:#27348f;background:#f6f0dc;font-synthesis:none;--ink:#27348f;--ink-dark:#18246f;--red:#d63b55;--orange:#e79a32;--green:#69b887;--paper:#f6f0dc;--reticle-spread:22px;--damage-strength:.4}
+@font-face{
+  font-family:"BB Ink Display";
+  src:url("/fonts/bb-ink-display-cjk.woff2") format("woff2");
+  font-display:swap;
+  font-style:normal;
+  font-weight:400;
+  unicode-range:U+3000-303F,U+3400-9FFF,U+FF00-FFEF;
+}
+@font-face{
+  font-family:"BB WenKai UI";
+  src:url("/fonts/bb-wenkai-ui-latin.woff2") format("woff2");
+  font-display:swap;
+  font-style:normal;
+  font-weight:400;
+  unicode-range:U+0020-00FF,U+2013-2014,U+2026,U+221E;
+}
+@font-face{
+  font-family:"BB WenKai UI";
+  src:url("/fonts/bb-wenkai-ui-cjk.woff2") format("woff2");
+  font-display:swap;
+  font-style:normal;
+  font-weight:400;
+  unicode-range:U+3000-303F,U+3400-9FFF,U+FF00-FFEF;
+}
+
+:root{font-family:'Patrick Hand','Chalkboard SE','Comic Sans MS',cursive;color:#27348f;background:#f6f0dc;font-synthesis:none;--font-ink-display:"BB Ink Display","STKaiti","Kaiti SC",serif;--font-ui:"BB WenKai UI","Kaiti SC",ui-serif,serif;--font-number:"Avenir Next Condensed","Arial Narrow",ui-sans-serif,system-ui,sans-serif;--font-title-en:"Avenir Next Condensed","Arial Narrow",ui-sans-serif,system-ui,sans-serif;--ink:#27348f;--ink-dark:#18246f;--red:#d63b55;--orange:#e79a32;--green:#69b887;--paper:#f6f0dc;--reticle-spread:22px;--damage-strength:.4}
 *{box-sizing:border-box}
 html,body,#app{width:100%;height:100%;margin:0;display:block;overflow:hidden;background:var(--paper)}
 body{user-select:none}
@@ -50,3 +75,368 @@ body.player-hit #vignette::before{animation:player-damage-wash 680ms cubic-bezie
 #recording-status{position:fixed;z-index:60;top:14px;left:50%;transform:translateX(-50%);padding:7px 13px;border:1px solid rgba(39,52,143,.45);background:rgba(246,240,220,.9);color:var(--ink);font-size:12px;letter-spacing:.08em}#recording-status a{color:var(--ink-dark);font-weight:900;text-decoration:none}
 @media(max-width:900px){.hud-weapons{right:3%;min-width:145px}.hud-score,.hud-health,.hud-ammo{left:8%}.controls-grid{grid-template-columns:repeat(2,1fr)}.ability-meter{bottom:3%}}
 @media(max-width:650px){.overlay-card{padding:32px 24px 24px}.controls-grid{display:none}.hud-weapons ol{display:none}.hud-weapons{min-width:120px}.grapple-meter{display:none}}
+
+/* Ink-wash mode is an additive theme branch. The unqualified rules above remain
+   the exact legacy notebook treatment used by ?style=ballpoint. */
+html[data-style="ink"]{
+  font-family:var(--font-ui);
+  color:#2a2c2a;
+  background:#e8e0cf;
+  --ink:#2a2c2a;
+  --ink-dark:#171918;
+  --indigo:#3e4b53;
+  --red:#9f3b32;
+  --orange:#8b4a37;
+  --green:#536b61;
+  --paper:#e8e0cf;
+}
+html[data-style="ink"],html[data-style="ink"] body,html[data-style="ink"] #app{background:var(--paper)}
+html[data-style="ink"] #paper-lines{
+  opacity:.46;
+  mix-blend-mode:multiply;
+  background-image:
+    linear-gradient(103deg,transparent 0,rgba(67,59,48,.018) 31%,transparent 33%,transparent 71%,rgba(67,59,48,.014) 73%,transparent 75%),
+    linear-gradient(7deg,transparent 0,transparent 44%,rgba(85,73,57,.016) 46%,transparent 48%,transparent 100%);
+  background-size:173px 127px,233px 181px;
+}
+html[data-style="ink"] #paper-lines::after{
+  opacity:.2;
+  background-image:
+    repeating-linear-gradient(8deg,transparent 0,transparent 23px,rgba(58,51,42,.026) 24px,transparent 25px,transparent 61px),
+    repeating-linear-gradient(96deg,transparent 0,transparent 37px,rgba(76,66,52,.018) 38px,transparent 39px,transparent 83px);
+  background-size:197px 149px,251px 193px;
+  mix-blend-mode:multiply;
+}
+html[data-style="ink"] #vignette{
+  border-radius:0;
+  box-shadow:inset 0 0 22px rgba(24,27,26,.2),inset 0 0 3px rgba(20,22,21,.34);
+}
+html[data-style="ink"] #vignette::before{
+  background:rgba(132,47,41,.3);
+  -webkit-mask-image:radial-gradient(circle at center,transparent 0,transparent min(31.5vmin,15.7vw),rgba(0,0,0,.13) min(42vmin,20.9vw),#000 min(80vmin,39.6vw));
+  mask-image:radial-gradient(circle at center,transparent 0,transparent min(31.5vmin,15.7vw),rgba(0,0,0,.13) min(42vmin,20.9vw),#000 min(80vmin,39.6vw));
+  mix-blend-mode:multiply;
+}
+html[data-style="ink"] #vignette::after{background:rgba(27,31,31,.14);mix-blend-mode:multiply}
+html[data-style="ink"] #hud{
+  color:var(--ink);
+  font-family:var(--font-ui);
+  font-weight:400;
+  letter-spacing:0;
+  text-shadow:none;
+}
+html[data-style="ink"] .hud-score strong,
+html[data-style="ink"] .hud-wave strong,
+html[data-style="ink"] .hud-health b,
+html[data-style="ink"] .hud-ammo strong,
+html[data-style="ink"] .hud-ammo span,
+html[data-style="ink"] .hud-weapons li::marker,
+html[data-style="ink"] .hud-weapons li em{
+  font-family:var(--font-number);
+  font-variant-numeric:tabular-nums lining-nums;
+}
+html[data-style="ink"] .hud-score,
+html[data-style="ink"] .hud-wave small,
+html[data-style="ink"] .hud-health span,
+html[data-style="ink"] .hud-weapons,
+html[data-style="ink"] .ability-meter,
+html[data-style="ink"] #context-tip,
+html[data-style="ink"] #boss-health{
+  font-family:var(--font-ui);
+  font-weight:400;
+}
+html[data-style="ink"] .hud-health>i,
+html[data-style="ink"] .ability-meter i,
+html[data-style="ink"] #boss-health i{
+  border:1px solid var(--ink);
+  background:rgba(232,224,207,.58);
+}
+html[data-style="ink"] .hud-health>i::after,
+html[data-style="ink"] .ability-meter i::after{background:var(--indigo)}
+html[data-style="ink"] #block-stamina i::after{background:var(--red)}
+html[data-style="ink"] #boss-health i{border-color:var(--red)}
+html[data-style="ink"] #boss-health i::after{background:var(--red)}
+html[data-style="ink"] .ammo-ticks{letter-spacing:0;opacity:.22}
+html[data-style="ink"] #wave-banner span,
+html[data-style="ink"] .eyebrow{letter-spacing:0}
+html[data-style="ink"] #wave-banner-ink{
+  display:block;
+  margin-bottom:.06em;
+  color:var(--ink-dark);
+  font-family:var(--font-ink-display);
+  font-size:clamp(50px,6.6vw,116px);
+  font-weight:400;
+  line-height:.74;
+  letter-spacing:.08em;
+}
+html[data-style="ink"] #wave-banner-title{
+  font-family:var(--font-number);
+  font-size:clamp(21px,2.15vw,42px);
+  font-weight:650;
+  letter-spacing:.08em;
+}
+html[data-style="ink"] #wave-banner-subtitle{
+  margin-top:.45em;
+  font-family:var(--font-ui);
+  font-size:clamp(12px,.9vw,18px);
+}
+html:not([data-style="ink"]) #wave-banner-ink,
+html:not([data-style="ink"]) #overlay-ink-title{display:none}
+html[data-style="ink"] .crosshair::before{
+  border:1px solid rgba(42,44,42,.72);
+  filter:drop-shadow(.3px .3px 0 rgba(23,25,24,.2));
+}
+html[data-style="ink"] .crosshair::after,
+html[data-style="ink"] .crosshair i{background:var(--red);box-shadow:.35px .35px 0 rgba(65,33,29,.28)}
+html[data-style="ink"] #hit-marker i{background:var(--red)}
+html[data-style="ink"] #hit-marker.headshot i{background:var(--orange)}
+html[data-style="ink"] #damage-indicator i::before,
+html[data-style="ink"] #damage-indicator i::after{
+  border-top-color:var(--red);
+  filter:drop-shadow(.5px .5px 0 rgba(65,33,29,.25));
+}
+html[data-style="ink"] #scope-overlay{
+  background:radial-gradient(circle at center,transparent 0,transparent min(29vh,22vw),rgba(42,49,51,.1) min(29vh,22vw),rgba(232,224,207,.96) min(30vh,23vw));
+}
+html[data-style="ink"] .scope-reticle{border-color:var(--ink)}
+html[data-style="ink"] .scope-reticle::before,
+html[data-style="ink"] .scope-reticle::after{background:var(--ink)}
+html[data-style="ink"] .scope-reticle i:first-child{border-color:var(--red)}
+html[data-style="ink"][data-ink-version]:not([data-ink-version="current"]){--paper:#efeee7;background:#efeee7}
+html[data-style="ink"][data-ink-version]:not([data-ink-version="current"]) #paper-lines,
+html[data-paper="off"] #paper-lines{display:none}
+#ink-controls{position:fixed;z-index:45;top:12px;left:50%;transform:translateX(-50%);font:12px/1.4 ui-sans-serif,system-ui;letter-spacing:0;color:#292c2b}
+#ink-controls select{max-width:190px;height:30px;border:1px solid #a6aba7;border-radius:3px;background:#f2f2ed;color:inherit;padding:2px 6px;font:inherit}
+#ink-controls details{position:fixed;top:38px;left:calc(50vw - 250px);width:230px;max-height:65vh;overflow:auto;padding:10px;background:#f2f2ed;border:1px solid #a6aba7;border-radius:4px}
+#ink-controls summary{cursor:pointer;margin-bottom:8px}
+#ink-controls label{display:grid;grid-template-columns:1fr 34px;gap:2px;margin-bottom:8px;text-transform:capitalize}
+#ink-controls output{text-align:right;font-variant-numeric:tabular-nums}
+#ink-controls input{grid-column:1/-1;width:100%;margin:0;accent-color:#536b61}
+.capture #ink-controls{display:none}
+@media(max-width:900px){#ink-controls details{left:50%;transform:translateX(-50%);max-height:25vh}}
+@media(max-width:650px){#ink-controls{top:70px}}
+html[data-style="ink"] #game-overlay{background:rgba(232,224,207,.14)}
+html[data-style="ink"] #game-overlay.visible{backdrop-filter:blur(2px)}
+html[data-style="ink"] .overlay-card{
+  position:relative;
+  color:var(--ink-dark);
+  background:linear-gradient(90deg,rgba(239,238,231,0),rgba(239,238,231,.9) 17%,rgba(239,238,231,.9) 83%,rgba(239,238,231,0));
+  border:0;
+  box-shadow:none;
+  transform:none;
+}
+html[data-style="ink"] #overlay-ink-title{
+  margin:0 0 2px;
+  color:var(--ink-dark);
+  font-family:var(--font-ink-display);
+  font-size:clamp(66px,7.4vw,118px);
+  font-weight:400;
+  line-height:.72;
+  letter-spacing:.1em;
+}
+html[data-style="ink"] .overlay-card h1{
+  margin:18px 0 22px;
+  font-family:var(--font-title-en);
+  font-size:clamp(46px,5.5vw,76px);
+  font-weight:650;
+  line-height:.78;
+  letter-spacing:.015em;
+}
+html[data-style="ink"] .overlay-card>p:not(.eyebrow):not(#overlay-ink-title),
+html[data-style="ink"] .overlay-card button,
+html[data-style="ink"] .controls-grid{
+  font-family:var(--font-ui);
+  font-weight:400;
+}
+html[data-style="ink"] .eyebrow{
+  font-family:var(--font-ui);
+  font-size:12px;
+  letter-spacing:.12em;
+  opacity:.66;
+}
+html[data-style="ink"] .overlay-card button{
+  color:var(--paper);
+  background:var(--ink-dark);
+  min-height:44px;
+  box-shadow:none;
+  letter-spacing:.025em;
+}
+html[data-style="ink"] .controls-grid{border-top-color:rgba(62,75,83,.34)}
+html[data-style="ink"] .controls-grid b{color:var(--red);font-family:var(--font-number);font-variant-numeric:tabular-nums}
+html[data-style="ink"] #stage{
+  color:var(--ink);
+  background:rgba(232,224,207,.76);
+  border-color:rgba(42,44,42,.24);
+  letter-spacing:0;
+}
+html[data-style="ink"] #recording-status{
+  color:var(--ink);
+  background:rgba(232,224,207,.92);
+  border-color:rgba(42,44,42,.36);
+  letter-spacing:0;
+}
+html[data-style="ink"] #recording-status a{color:var(--ink-dark)}
+
+@media(max-width:650px){
+  html[data-style="ink"] .overlay-card{width:92vw;padding:28px 20px 24px}
+  html[data-style="ink"] .overlay-card h1{font-size:36px;line-height:.78}
+}
+
+/* Chinese ink interface: one display mark, readable copy, quiet tactical HUD. */
+html[data-style="ink"] { --ui-safe: clamp(22px, 4vw, 72px); }
+html[data-style="ink"] #stage { display:none; }
+html[data-style="ink"][data-ink-debug="true"] #stage { display:block; }
+html[data-style="ink"] #ink-controls { font-family:var(--font-ui); }
+html[data-style="ink"] #hud { transition:opacity .2s; }
+html[data-style="ink"] body:not([data-game-mode="playing"]) #hud { opacity:0; }
+html[data-style="ink"] #game-overlay { background:rgba(239,238,231,.20); }
+html[data-style="ink"] #game-overlay.visible { backdrop-filter:none; }
+html[data-style="ink"] .overlay-card {
+  width:min(760px,92vw); padding:42px 60px 38px;
+  background:radial-gradient(ellipse at center,rgba(239,238,231,.98) 25%,rgba(239,238,231,.92) 55%,rgba(239,238,231,0) 75%);
+}
+html[data-style="ink"] .eyebrow { font-size:14px;letter-spacing:.28em;opacity:.75;margin:0 0 30px; }
+html[data-style="ink"] #overlay-ink-title { font-size:clamp(96px,11vw,160px);line-height:1;letter-spacing:.14em;padding-left:.14em; }
+html[data-style="ink"] .ink-seal {
+  position:absolute;top:105px;right:calc(50% - 194px);font-family:var(--font-ui);
+  color:var(--red);border:1px solid currentColor;padding:5px 4px;
+  font-size:17px;line-height:1.1;transform:rotate(3deg);opacity:.85;
+}
+html:not([data-style="ink"]) .ink-seal { display:none; }
+html[data-style="ink"] .overlay-card h1 {
+  font-family:var(--font-ui);font-size:23px;line-height:1.65;font-weight:400;
+  margin:12px 0 16px;letter-spacing:.17em;
+}
+html[data-style="ink"] .overlay-card>p:not(.eyebrow):not(#overlay-ink-title) {
+  font-size:16px;line-height:1.9;margin:0 auto 24px;max-width:470px;
+}
+html[data-style="ink"] .overlay-card button {
+  font-family:var(--font-ui);font-size:22px;line-height:1.4;padding:10px 40px;
+  background:#87473b;min-width:170px;min-height:48px;letter-spacing:.12em;
+}
+html[data-style="ink"] .overlay-card button:hover:not(:disabled) { background:#713c32;transform:none; }
+html[data-style="ink"] .overlay-card button:focus-visible { outline:2px solid var(--ink);outline-offset:5px; }
+html[data-style="ink"] .controls-grid {
+  grid-template-columns:repeat(3,1fr);gap:14px 20px;font-size:14px;line-height:1.5;
+  margin:32px auto 0;padding-top:22px;border-top:1px solid rgba(42,44,42,.22);
+}
+html[data-style="ink"] .controls-grid b { font-family:var(--font-ui);font-size:13px;font-weight:400;min-width:68px; }
+html[data-style="ink"] .hud-score { top:30px;left:var(--ui-safe);font-size:16px; }
+html[data-style="ink"] .hud-score>span { display:block;letter-spacing:.22em;margin-bottom:6px; }
+html[data-style="ink"] .hud-score strong { font-size:28px;font-weight:600; }
+html[data-style="ink"] .hud-score,
+html[data-style="ink"] .hud-wave,
+html[data-style="ink"] .hud-weapons,
+html[data-style="ink"] #context-tip { isolation:isolate; }
+html[data-style="ink"] .hud-score::before,
+html[data-style="ink"] .hud-wave::before,
+html[data-style="ink"] .hud-weapons::before,
+html[data-style="ink"] #context-tip::before {
+  content:"";position:absolute;inset:-18px -24px;z-index:-1;pointer-events:none;
+  background:radial-gradient(ellipse,rgba(239,238,231,.92) 20%,rgba(239,238,231,.62) 48%,transparent 73%);
+}
+html[data-style="ink"] .hud-wave { top:30px;right:var(--ui-safe);font-weight:400; }
+html[data-style="ink"] .hud-wave strong { font-family:var(--font-ui);font-size:23px;letter-spacing:.12em;font-weight:400; }
+html[data-style="ink"] .hud-wave small { font-size:14px;font-weight:400; }
+html[data-style="ink"] .hud-health { left:var(--ui-safe);bottom:128px;font-size:15px;gap:10px; }
+html[data-style="ink"] .hud-health>i { width:130px;height:5px;border:0;transform:none;background:rgba(42,44,42,.13); }
+html[data-style="ink"] .hud-ammo { left:var(--ui-safe);bottom:46px;line-height:1; }
+html[data-style="ink"] .ammo-label { display:block;font-family:var(--font-ui);font-size:14px;margin-bottom:5px;letter-spacing:.15em; }
+html[data-style="ink"] .hud-ammo strong { font-size:46px;font-weight:600; }
+html[data-style="ink"] .hud-ammo span { font-size:21px;font-weight:400;margin-left:5px;opacity:.7; }
+html[data-style="ink"] .ammo-ticks { display:none; }
+html[data-style="ink"] .hud-weapons { right:var(--ui-safe);bottom:42px;min-width:225px;max-width:310px; }
+html[data-style="ink"] .hud-weapons ol { font-size:14px;line-height:1.8;max-width:190px;margin:0 0 14px auto;padding-left:22px; }
+html[data-style="ink"] .hud-weapons li { opacity:.68;padding-left:5px; }
+html[data-style="ink"] .hud-weapons li.selected { opacity:1;color:#883e33;font-weight:400; }
+html[data-style="ink"] .hud-weapons li em { font-size:12px; }
+html[data-style="ink"] .hud-weapons>strong { font-size:27px;font-weight:400;letter-spacing:.08em;line-height:1.4; }
+html[data-style="ink"] .hud-weapons>small { display:block;font-size:13px;line-height:1.6; }
+html[data-style="ink"] .ability-meter { bottom:46px;font-size:14px;opacity:.85; }
+html[data-style="ink"] .ability-meter i { height:4px;border:0;background:rgba(42,44,42,.13); }
+html[data-style="ink"] #block-stamina { bottom:89px;opacity:0; }
+html[data-style="ink"] #block-stamina.visible { opacity:.85; }
+html[data-style="ink"] #context-tip { bottom:150px;font-size:15px;max-width:44vw;white-space:normal;text-align:center;line-height:1.6; }
+html[data-style="ink"] #wave-banner {
+  top:13%;width:360px;padding:24px 15px;
+  background:radial-gradient(ellipse,rgba(239,238,231,.91),rgba(239,238,231,.65) 42%,transparent 72%);
+}
+html[data-style="ink"] #wave-banner-ink { font-size:76px;line-height:1;margin:0 0 8px; }
+html[data-style="ink"] #wave-banner-title { font-family:var(--font-ui);font-size:24px;line-height:1.4;font-weight:400; }
+html[data-style="ink"] #wave-banner-subtitle { font-size:15px;line-height:1.6; }
+html[data-style="ink"] #boss-health { top:30px; }
+html[data-style="ink"] #boss-health strong { font-family:var(--font-ui);font-size:23px;font-weight:400;letter-spacing:.2em; }
+html[data-style="ink"] #boss-health i { height:5px;border:0;margin-top:10px; }
+#runtime-error { position:fixed;z-index:100;top:20px;left:50%;transform:translateX(-50%);padding:14px 24px;background:#efeee7;color:#873c32;font:16px/1.6 var(--font-ui); }
+@media(max-width:900px) {
+  html[data-style="ink"] .overlay-card { padding:26px 30px; }
+  html[data-style="ink"] .controls-grid { gap:8px 12px;font-size:13px; }
+  html[data-style="ink"] .hud-weapons { min-width:185px; }
+}
+@media(max-height:650px) {
+  html[data-style="ink"] .overlay-card { padding:12px 26px; }
+  html[data-style="ink"] .eyebrow { margin-bottom:10px; }
+  html[data-style="ink"] #overlay-ink-title { font-size:90px; }
+  html[data-style="ink"] .ink-seal { top:60px;right:calc(50% - 135px);font-size:14px; }
+  html[data-style="ink"] .controls-grid { margin-top:18px;padding-top:14px;gap:5px 10px; }
+  html[data-style="ink"] .hud-weapons ol { display:none; }
+  html[data-style="ink"] #wave-banner { top:14%;padding:10px; }
+  html[data-style="ink"] #wave-banner-ink { font-size:56px; }
+}
+@media(max-width:650px) {
+  html[data-style="ink"] .controls-grid { display:grid;grid-template-columns:repeat(2,1fr); }
+  html[data-style="ink"] .overlay-card h1 { font-size:20px; }
+  html[data-style="ink"] .ink-seal { right:calc(50% - 145px); }
+  html[data-style="ink"] #context-tip { bottom:190px;max-width:80vw; }
+}
+@media(prefers-reduced-motion:reduce) {
+  html[data-style="ink"] #hud,html[data-style="ink"] #game-overlay,html[data-style="ink"] #wave-banner { transition:none; }
+}
+
+/* One brush-lettering voice; small instructions and live metrics stay readable. */
+#ink-damage-overlay { position:fixed;inset:0;width:100%;height:100%;z-index:10;pointer-events:none;mix-blend-mode:multiply;opacity:.68; }
+body:not([data-game-mode="playing"]) #ink-damage-overlay { visibility:hidden; }
+html[data-style="ink"] #vignette::before { background:rgba(24,30,27,.08); }
+html[data-style="ink"] #damage-indicator i::before,
+html[data-style="ink"] #damage-indicator i::after { border-top-color:#343f39; }
+html[data-style="ink"] { --font-ink-display:"BB Ink Display","BB WenKai UI","Kaiti SC",serif; }
+html[data-style="ink"] .eyebrow,
+html[data-style="ink"] .ink-seal,
+html[data-style="ink"] .overlay-card h1,
+html[data-style="ink"] .overlay-card>p:not(.eyebrow):not(#overlay-ink-title),
+html[data-style="ink"] .overlay-card button,
+html[data-style="ink"] .hud-score>span,
+html[data-style="ink"] .hud-health>span,
+html[data-style="ink"] .ammo-label,
+html[data-style="ink"] .hud-wave strong,
+html[data-style="ink"] .hud-weapons li>span,
+html[data-style="ink"] .hud-weapons>strong,
+html[data-style="ink"] .ability-meter>span,
+html[data-style="ink"] #context-tip,
+html[data-style="ink"] #wave-banner-title,
+html[data-style="ink"] #wave-banner-subtitle,
+html[data-style="ink"] #boss-health strong {
+  font-family:var(--font-ink-display);font-weight:400;
+}
+html[data-style="ink"] .eyebrow { font-size:20px;letter-spacing:.18em; }
+html[data-style="ink"] .overlay-card h1 { font-size:32px;line-height:1.3;letter-spacing:.12em; }
+html[data-style="ink"] .overlay-card>p:not(.eyebrow):not(#overlay-ink-title) { font-size:22px;line-height:1.6;max-width:540px; }
+html[data-style="ink"] .overlay-card button { font-size:30px;line-height:1.15; }
+html[data-style="ink"] .hud-score>span,
+html[data-style="ink"] .hud-health>span,
+html[data-style="ink"] .ammo-label,
+html[data-style="ink"] .ability-meter>span { font-size:21px; }
+html[data-style="ink"] .hud-wave strong { font-size:32px; }
+html[data-style="ink"] .hud-weapons li>span { font-size:20px; }
+html[data-style="ink"] .hud-weapons>strong { font-size:34px; }
+html[data-style="ink"] #context-tip { font-size:22px;line-height:1.4; }
+html[data-style="ink"] #wave-banner-title { font-size:32px; }
+html[data-style="ink"] #wave-banner-subtitle { font-size:22px;line-height:1.4; }
+html[data-style="ink"] #boss-health strong { font-size:30px; }
+@media(max-height:650px), (max-width:650px) {
+  html[data-style="ink"] .eyebrow { font-size:18px; }
+  html[data-style="ink"] .overlay-card h1 { font-size:27px;margin:8px 0 12px; }
+  html[data-style="ink"] .overlay-card>p:not(.eyebrow):not(#overlay-ink-title) { font-size:20px;line-height:1.4;margin-bottom:18px; }
+  html[data-style="ink"] .overlay-card button { font-size:27px; }
+  html[data-style="ink"] #context-tip { font-size:20px; }
+}
