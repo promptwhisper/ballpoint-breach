@@ -7,7 +7,7 @@ export const WEAPON_COPY: Record<string, { name: string; hint: string }> = {
   KATANA: { name: '长刀', hint: '左键挥斩 · 按住右键格挡并反弹子弹' },
 };
 
-export const CHINESE_NUMERALS = ['零', '一', '二', '三', '四', '五'];
+export const CHINESE_NUMERALS = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
 export const waveLabel = (wave: number): string => `第${CHINESE_NUMERALS[wave] ?? wave}阵`;
 
 export const MESSAGE_COPY: Record<string, string> = {
@@ -16,6 +16,11 @@ export const MESSAGE_COPY: Record<string, string> = {
   'NO CLEAN MARGINS': '四面来敌 · 留意高处',
   'CROSS OUT EVERYTHING': '战意正酣 · 突破重围',
   'THE DOODLER IS COMING': '墨魁将至 · 决战在即',
+  'SECOND DRAFT': '再起新稿 · 墨势更急',
+  'CROSSFIRE IN THE MARGINS': '页边交火 · 留意远处',
+  'HEAVY INK': '浓墨压境 · 重敌来袭',
+  'NO ROOM TO BREATHE': '步步紧逼 · 无暇喘息',
+  'THE FINAL DOODLE': '终墨落笔 · 墨魁再临',
   'THE DOODLER': '墨魁',
   'PHASE TWO · THE LINES GET ANGRY': '墨魁狂怒 · 第二阶段',
   'WAVE CLEARED': '此阵已破',

@@ -40,6 +40,10 @@ export function accumulateDamageStrength(
 }
 
 export class Hud {
+  private readonly weaponRows = new Map<number, { row: HTMLElement; ammo: HTMLElement | null }>();
+  private setText(element: HTMLElement, value: string): void {
+    if (element.textContent !== value) element.textContent = value;
+  }
   readonly startButton: HTMLButtonElement;
   readonly restartButton: HTMLButtonElement;
   private readonly overlay: HTMLElement;
@@ -114,6 +118,9 @@ export class Hud {
     this.damageIndicator = required('#damage-indicator');
     this.scope = required('#scope-overlay');
     this.inkDamage = this.inkStyle ? new InkDamageOverlay(root) : null;
+    root.querySelectorAll<HTMLElement>('[data-weapon-slot]').forEach(row => {
+      this.weaponRows.set(Number(row.dataset.weaponSlot), { row, ammo: row.querySelector('[data-weapon-ammo]') });
+    });
   }
 
   setMode(mode: OverlayMode): void {
@@ -127,10 +134,10 @@ export class Hud {
     if (this.inkStyle) {
       const copy = {
         loading: ['入墨', '墨境将启', '正在铺纸研墨，请稍候。'],
-        start: ['破阵', '一纸墨境 · 五阵来敌', '执枪入画，守住此地。击退五阵来敌，迎战墨魁。'],
+        start: ['破阵', '一纸墨境 · 十阵来敌', '执枪入画，守住此地。击退十阵来敌，迎战墨魁。'],
         paused: ['暂歇', '战局已暂停', '轻触画面继续'],
         defeat: ['落墨', '此战未竟', '整顿行装，再入墨境。'],
-        victory: ['破阵', '五阵尽破 · 墨魁已伏', '这一纸战局，由你写下终章。'],
+        victory: ['破阵', '十阵尽破 · 墨魁已伏', '这一纸战局，由你写下终章。'],
         playing: ['', '', ''],
       }[mode];
       this.overlayInkTitle.textContent = copy[0];
@@ -149,7 +156,7 @@ export class Hud {
     } else if (mode === 'start') {
       this.overlayInkTitle.textContent = '破阵';
       this.overlayTitle.textContent = 'BALLPOINT BREACH';
-      this.overlayCopy.textContent = 'survive five waves in a construction-yard sketchbook';
+      this.overlayCopy.textContent = 'survive ten waves in a construction-yard sketchbook';
       this.startButton.textContent = 'CLICK / TAP TO ENTER THE PAGE';
       this.startButton.disabled = false;
     } else if (mode === 'paused') {
@@ -163,32 +170,32 @@ export class Hud {
       this.restartButton.textContent = this.inkStyle ? 'TRY AGAIN' : 'DRAW AGAIN';
     } else if (mode === 'victory') {
       this.overlayInkTitle.textContent = '胜';
-      this.overlayTitle.textContent = this.inkStyle ? 'YARD CLEARED' : 'PAGE CLEARED';
-      this.overlayCopy.textContent = this.inkStyle ? 'THE DOODLER has fallen' : 'THE DOODLER has been erased';
+      this.overlayTitle.textContent = 'PAGE CLEARED';
+      this.overlayCopy.textContent = 'all ten waves cleared · THE DOODLER has been erased';
       this.restartButton.textContent = 'PLAY AGAIN';
     }
   }
 
   render(snapshot: HudSnapshot): void {
-    this.score.textContent = String(snapshot.score);
-    this.wave.textContent = this.inkStyle ? waveLabel(snapshot.wave) : `WAVE ${snapshot.wave}`;
-    this.enemies.textContent = this.inkStyle ? `余敌 ${snapshot.enemiesLeft} 人` : `${snapshot.enemiesLeft} ${snapshot.enemiesLeft === 1 ? 'enemy' : 'enemies'} left`;
-    this.health.textContent = String(Math.ceil(snapshot.health));
+    this.setText(this.score, String(snapshot.score));
+    this.setText(this.wave, this.inkStyle ? waveLabel(snapshot.wave) : `WAVE ${snapshot.wave}`);
+    this.setText(this.enemies, this.inkStyle ? `余敌 ${snapshot.enemiesLeft} 人` : `${snapshot.enemiesLeft} ${snapshot.enemiesLeft === 1 ? 'enemy' : 'enemies'} left`);
+    this.setText(this.health, String(Math.ceil(snapshot.health)));
     this.healthBar.style.setProperty('--value', `${Math.max(0, snapshot.health / snapshot.maxHealth) * 100}%`);
     const current = snapshot.weapons.find((weapon) => weapon.selected) ?? snapshot.weapons[0];
     if (current) {
-      this.ammo.textContent = current.name === 'KATANA' ? '∞' : String(current.ammo);
-      this.reserve.textContent = current.name === 'KATANA' ? '' : `/${current.reserve}`;
-      this.weaponName.textContent = this.inkStyle ? WEAPON_COPY[current.name]?.name ?? current.name : current.name;
-      this.weaponDescription.textContent = this.inkStyle ? WEAPON_COPY[current.name]?.hint ?? current.description : current.description;
-      this.root.body.dataset.reticle = current.name.toLowerCase();
+      this.setText(this.ammo, current.name === 'KATANA' ? '∞' : String(current.ammo));
+      this.setText(this.reserve, current.name === 'KATANA' ? '' : `/${current.reserve}`);
+      this.setText(this.weaponName, this.inkStyle ? WEAPON_COPY[current.name]?.name ?? current.name : current.name);
+      this.setText(this.weaponDescription, this.inkStyle ? WEAPON_COPY[current.name]?.hint ?? current.description : current.description);
+      if (this.root.body.dataset.reticle !== current.name.toLowerCase()) this.root.body.dataset.reticle = current.name.toLowerCase();
     }
     for (const weapon of snapshot.weapons) {
-      const row = this.root.querySelector<HTMLElement>(`[data-weapon-slot="${weapon.slot}"]`);
-      if (!row) continue;
+      const cached = this.weaponRows.get(weapon.slot);
+      if (!cached) continue;
+      const { row, ammo } = cached;
       row.classList.toggle('selected', weapon.selected);
-      const ammo = row.querySelector<HTMLElement>('[data-weapon-ammo]');
-      if (ammo) ammo.textContent = weapon.name === 'KATANA' ? '∞' : `${weapon.ammo}/${weapon.reserve}`;
+      if (ammo) this.setText(ammo, weapon.name === 'KATANA' ? '∞' : `${weapon.ammo}/${weapon.reserve}`);
     }
     this.grappleBar.style.setProperty('--value', `${Math.max(0, Math.min(1, snapshot.grappleRatio)) * 100}%`);
     const showBlock = snapshot.blockRatio !== undefined;
@@ -196,7 +203,7 @@ export class Hud {
     if (showBlock) this.blockBar.style.setProperty('--value', `${Math.max(0, Math.min(1, snapshot.blockRatio ?? 0)) * 100}%`);
     this.bossWrap.classList.toggle('visible', Boolean(snapshot.boss));
     if (snapshot.boss) {
-      this.bossName.textContent = this.inkStyle ? chineseMessage(snapshot.boss.name) : snapshot.boss.name;
+      this.setText(this.bossName, this.inkStyle ? chineseMessage(snapshot.boss.name) : snapshot.boss.name);
       this.bossBar.style.setProperty('--value', `${Math.max(0, snapshot.boss.health / snapshot.boss.maxHealth) * 100}%`);
     }
     this.scope.classList.toggle('visible', Boolean(snapshot.scoped));

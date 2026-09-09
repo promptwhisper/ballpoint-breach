@@ -12,7 +12,6 @@
     <div id="vignette" aria-hidden="true"></div>
 
     <section id="hud" aria-label="战局状态">
-      <button id="sound-toggle" type="button" aria-label="开启声音" aria-pressed="false">声音 · 开启</button>
       <div class="hud-score"><span>战绩</span> <strong data-hud="score">0</strong></div>
       <div class="hud-wave"><strong data-hud="wave">第一阵</strong><small data-hud="enemies">余敌 0 人</small></div>
 
@@ -47,7 +46,25 @@
       <div id="scope-overlay"><div class="scope-reticle"><i></i><i></i></div></div>
     </section>
 
+    <button id="settings-toggle" type="button" aria-label="设置" title="设置" aria-haspopup="dialog" aria-expanded="false" aria-controls="settings-panel">
+      <svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 3-.5 2.2-1.7 1-2.2-.6-2 3.4 1.7 1.6v2L2.6 14l2 3.4 2.2-.6 1.7 1L9 20h4l.5-2.2 1.7-1 2.2.6 2-3.4-1.7-1.4v-2L19.4 9l-2-3.4-2.2.6-1.7-1L13 3Z" transform="translate(1 .5)"/><circle cx="12" cy="12" r="3.1"/></svg>
+    </button>
+    <section id="settings-panel" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="settings-card">
+        <header><h2 id="settings-title">操作设置</h2><button id="settings-close" type="button">完成</button></header>
+        <div class="settings-row"><span>游戏音效</span><button id="sound-toggle" type="button" aria-pressed="true">已开启</button></div>
+        <label class="sensitivity-label" for="look-sensitivity">视角灵敏度 <output id="sensitivity-value" for="look-sensitivity">1.8 倍</output></label>
+        <input id="look-sensitivity" type="range" min="0.5" max="4" step="0.1" value="1.8">
+        <p class="settings-help">左右滑动调节，越大转向越快；1.0 倍为原版速度。</p>
+        <fieldset><legend>开火方式</legend>
+          <label><input type="radio" name="fire-mode" value="screen" checked><span>右侧屏幕<small>轻点射击，按住连射，滑动转向</small></span></label>
+          <label><input type="radio" name="fire-mode" value="button"><span>独立按钮<small>屏幕只转向，按射击键开火</small></span></label>
+        </fieldset>
+        <p class="settings-help">设置自动保存 · 调整期间暂停战局</p>
+      </div>
+    </section>
     <section id="touch-controls" aria-label="触控操作">
+      <button class="action-fire" type="button" data-touch-action="fire" aria-label="射击"><span>◎</span><small>射击</small></button>
       <div class="touch-move" data-touch-joystick role="button" aria-label="移动摇杆">
         <i class="touch-stick" aria-hidden="true"></i>
       </div>
@@ -64,7 +81,7 @@
         <p class="eyebrow">水墨手绘 · 第一人称射击</p>
         <span class="ink-seal" aria-hidden="true">墨<br>戏</span>
         <p id="overlay-ink-title" lang="zh-CN">破阵</p>
-        <h1 id="overlay-title">一纸墨境 · 五阵来敌</h1>
+        <h1 id="overlay-title">一纸墨境 · 十阵来敌</h1>
         <p id="overlay-copy">正在铺纸研墨，请稍候。</p>
         <button id="start-button" type="button" disabled>正在入墨…</button>
         <button id="restart-button" type="button" hidden>重新入阵</button>

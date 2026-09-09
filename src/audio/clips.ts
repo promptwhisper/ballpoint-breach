@@ -17,7 +17,7 @@ export const AUDIO_CUES = {
   dryFire: { duration: 0.18, gain: 1.15 },
   weaponSwitch: { duration: 0.45, gain: 0.92 },
   pickup: { duration: 0.55, gain: 1.05 },
-  enemyFire: { duration: 0.35, gain: 0.72 },
+  enemyFire: { duration: 0.3, gain: 0.6 },
   worldImpact: { duration: 0.3, gain: 0.76 },
   enemyDeath: { duration: 0.5, gain: 1.0 },
   pump: { duration: 0.38, gain: 1.05 },

@@ -24,7 +24,7 @@ const clips = [
   ['dryFire', 'tinysized/sfx-cc0/scissors-close-01.wav', 0.18],
   ['weaponSwitch', 'tinysized/sfx-cc0/knife-unsheathe-02.wav', 0.45],
   ['pickup', 'tinysized/sfx-cc0/coins-shake-01.wav', 0.55],
-  ['enemyFire', 'tinysized/sfx-cc0/paralyzer-discharge-01.wav', 0.35],
+  ['enemyFire', 'guns/shots/pistol.wav', 0.3],
   ['worldImpact', 'tinysized/sfx-cc0/metal-hammer-hit-01.wav', 0.3],
   ['enemyDeath', 'tinysized/sfx-cc0/cover-paper-tear-01.wav', 0.5],
   ['pump', 'tinysized/sfx-cc0/drawer-close-01.wav', 0.38],
@@ -50,7 +50,8 @@ for (const [name, file, duration] of clips) {
     continue;
   }
   const pcm = ffmpeg(['-i', resolve(source, file), '-t', String(duration), '-af',
-    `afade=t=out:st=${duration - 0.04}:d=0.04,volume=0.75`,
+    name === 'enemyFire' ? 'lowpass=f=5500,afade=t=out:st=0.26:d=0.04,volume=0.65'
+      : `afade=t=out:st=${duration - 0.04}:d=0.04,volume=0.75`,
     '-ac', '1', '-ar', String(sampleRate), '-f', 's16le', 'pipe:1']);
   encode(name, pcm);
   console.log(`${name}: ${file} (${duration}s)`);
