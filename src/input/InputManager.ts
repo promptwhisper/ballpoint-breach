@@ -125,6 +125,9 @@ export class InputManager {
   private touchLookCanFire = false;
   private touchLookFiring = false;
   private touchFireTimer: number | null = null;
+  private touchSensitivity = 1.8;
+  private fireMode: 'screen' | 'button' = 'screen';
+  private buttonFireId: number | null = null;
   private joystickTouchId: number | null = null;
   private joystickStartX = 0;
   private joystickStartY = 0;
@@ -182,6 +185,12 @@ export class InputManager {
   setEnabled(value: boolean): void {
     this.enabled = value;
     if (!value) this.clearHeld();
+  }
+
+  setTouchSettings(sensitivity: number, fireMode: 'screen' | 'button'): void {
+    this.clearHeld();
+    this.touchSensitivity = Number.isFinite(sensitivity) ? Math.max(0.5, Math.min(4, sensitivity)) : 1.8;
+    this.fireMode = fireMode;
   }
 
   consumeFrame(): InputFrame {
@@ -245,7 +254,7 @@ export class InputManager {
   }
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
-    if ((event.code === 'Space' || event.code === 'Enter') && (event.target as HTMLElement | null)?.closest?.('#sound-toggle')) return;
+    if ((event.target as HTMLElement | null)?.closest?.('#settings-panel, #settings-toggle')) return;
     if (!this.enabled) return;
     this.keys.add(event.code);
     if (event.repeat) return;
@@ -307,7 +316,7 @@ export class InputManager {
     this.touchLookStartY = touch.clientY;
     this.touchLookMoved = false;
     this.touchLookFiring = false;
-    this.touchLookCanFire = isRightInteractionZone(
+    this.touchLookCanFire = this.fireMode === 'screen' && isRightInteractionZone(
       touch.clientX,
       touch.clientY,
       window.innerWidth,
@@ -339,11 +348,11 @@ export class InputManager {
       if (!this.touchLookFiring) this.cancelTouchFireTimer();
     }
     if (window.innerHeight > window.innerWidth) {
-      this.lookX += deltaY * 0.9;
-      this.lookY -= deltaX * 0.9;
+      this.lookX += deltaY * 0.9 * this.touchSensitivity;
+      this.lookY -= deltaX * 0.9 * this.touchSensitivity;
     } else {
-      this.lookX += deltaX * 0.9;
-      this.lookY += deltaY * 0.9;
+      this.lookX += deltaX * 0.9 * this.touchSensitivity;
+      this.lookY += deltaY * 0.9 * this.touchSensitivity;
     }
     this.touchLookX = touch.clientX;
     this.touchLookY = touch.clientY;
@@ -411,6 +420,11 @@ export class InputManager {
     event.preventDefault();
     event.stopPropagation();
     const action = (event.currentTarget as HTMLElement).dataset.touchAction;
+    if (action === 'fire' && this.fireMode === 'button' && this.controlsActive) {
+      this.buttonFireId = event.changedTouches[0]?.identifier ?? null;
+      this.primary = true; this.primaryPressed = true;
+      (event.currentTarget as HTMLElement).classList.add('active');
+    }
     if (action === 'forward') this.keys.add('KeyW');
     if (action === 'back') this.keys.add('KeyS');
     if (action === 'left') this.keys.add('KeyA');
@@ -428,6 +442,10 @@ export class InputManager {
     event.preventDefault();
     event.stopPropagation();
     const action = (event.currentTarget as HTMLElement).dataset.touchAction;
+    if (action === 'fire' && Array.from(event.changedTouches).some(touch => touch.identifier === this.buttonFireId)) {
+      this.buttonFireId = null; this.primary = false;
+      (event.currentTarget as HTMLElement).classList.remove('active');
+    }
     if (action === 'forward') this.keys.delete('KeyW');
     if (action === 'back') this.keys.delete('KeyS');
     if (action === 'left') this.keys.delete('KeyA');
@@ -435,6 +453,8 @@ export class InputManager {
   };
 
   private readonly clearHeld = (): void => {
+    this.buttonFireId = null;
+    document.querySelector('[data-touch-action="fire"]')?.classList.remove('active');
     this.keys.clear();
     this.primary = false;
     this.primaryPressed = false;

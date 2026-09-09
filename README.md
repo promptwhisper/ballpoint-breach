@@ -55,7 +55,7 @@ If the browser rejects Pointer Lock, the game automatically continues in unlocke
 
 ## Game loop
 
-Five automatically advancing waves combine Grunts, Rushers, Heavies, and Marksmen. Wave five introduces **THE DOODLER**, whose telegraphed move set includes a charge, pencil sweep, ground slam, projectile volley, and summons. Clears restore some health and ammunition. Defeat and victory both support a clean in-place restart.
+Ten automatically advancing waves combine Grunts, Rushers, Heavies, and Marksmen. Wave five introduces **THE DOODLER**, whose telegraphed move set includes a charge, pencil sweep, ground slam, projectile volley, and summons. Wave ten brings the boss back for the final battle. Clears restore some health and ammunition. Defeat and victory both support a clean in-place restart.
 
 The construction complex spans a `72 × 78` playable floor, with a long rear undercroft, remote west return route, separated buildings, and connected elevated paths. Enemy deaths break into directional ink fragments and leave persistent procedural splats instead of intact ragdolls. Camera and weapon motion share one distance-driven gait phase, tuned to the reference rifle cadence.
 
@@ -77,17 +77,36 @@ Q fires a bounded blue line. Enemy hits pull the target toward the player; desig
 - `src/player/` and `src/physics/` implement the kinematic capsule controller.
 - `src/combat/` contains weapon definitions, state machines, and procedural viewmodels.
 - `src/enemies/` contains reusable doodle rigs, finite-state AI, hit zones, boss logic, and the projectile pool.
-- `src/waves/` owns deterministic five-wave pacing.
+- `src/waves/` owns deterministic ten-wave pacing.
 - `src/effects/`, `src/audio/`, and `src/ui/` provide bounded feedback systems.
 
 Audio uses downloaded samples, not synthesized effects. Normal web builds use
 local MP3 files; experimental mini-tool builds compile those samples into external
 JavaScript data and decode them with Web Audio, without shipping MP3 files. Click
-Start to unlock playback; the top-center SOUND button mutes or retries playback.
+Start to unlock playback; the right-side gear button opens sound and touch controls.
 Mini-tool builds retain optional iOS playback-session routing. Gameplay includes
 sampled movement, weapon handling, impacts, enemy, pickup and wave feedback.
 Both paths limit overlap to six voices. Source attribution, licenses, build
 instructions and client-validation limits are in [AUDIO_CREDITS.md](AUDIO_CREDITS.md).
+
+### Mobile settings
+
+The settings panel pauses an active round and resumes it when closed. Sound
+preferences, touch-look sensitivity (0.5–4.0×, default 1.8× the original speed),
+and firing mode persist locally when the host allows storage. Mouse sensitivity
+and movement joystick speed are unchanged.
+
+Right-screen firing remains the default: tap to fire, hold for automatic fire,
+and drag to look. Dedicated-button mode makes the screen look-only and shows
+a large firing button alongside the existing aim/jump controls. A second finger
+can aim while the firing button is held. Semi-automatic weapons retain their
+existing trigger behavior.
+
+Build the upload artifact with `npm run build:minitool`, then ZIP the contents
+of `dist/`. The package allowlist check and sampled-audio verification still
+apply. `scripts/verify-settings.mjs` expects the built directory served at
+`http://127.0.0.1:8912/` and exercises portrait, landscape, pause, persistence,
+aimed firing, multi-touch holding, and touch cancellation.
 
 The host keeps simulation and visuals separate: weapons emit hitscan/melee requests, enemies emit attacks and lifecycle events, and `Game` resolves those requests against the shared arena queries.
 

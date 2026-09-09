@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SettingsPanel } from '../ui/SettingsPanel';
 import { AudioSystem, type GameSound } from '../audio/AudioSystem';
 import {
   WEAPON_DEFINITIONS,
@@ -313,6 +314,7 @@ export class Game {
   }
 
   dispose(): void {
+    this.settings?.dispose();
     cancelAnimationFrame(this.requestId);
     if (this.deathFlashTimeout !== null) window.clearTimeout(this.deathFlashTimeout);
     document.body.classList.remove('death-hit');
@@ -335,6 +337,16 @@ export class Game {
   }
 
   private installEvents(): void {
+    this.settings = new SettingsPanel(this.input, () => {
+      this.resumeAfterSettings = this.state.mode === 'playing';
+      if (this.resumeAfterSettings) this.setMode('paused');
+    }, () => {
+      if (this.resumeAfterSettings && !document.hidden && this.state.mode === 'paused') {
+        this.audio.resume(); this.requestGameplayControl();
+      }
+      this.resumeAfterSettings = false;
+    });
+    if (!this.settings.values.soundEnabled) this.audio.setEnabled(false);
     window.addEventListener('resize', this.resize);
     document.addEventListener('visibilitychange', this.handleVisibilityChange);
     this.canvas.addEventListener('webglcontextlost', this.handleContextLost);
@@ -347,7 +359,11 @@ export class Game {
     }
     document.querySelector('#sound-toggle')?.addEventListener('click', this.handleSoundToggle);
     this.audio.onStatus = this.updateSoundButton;
+    this.updateSoundButton(this.audio.getStatus());
   }
+
+  private settings?: SettingsPanel;
+  private resumeAfterSettings = false;
 
   private readonly handleAudioGesture = (event: Event): void => {
     if (!event.isTrusted || this.state.mode !== 'playing' || document.hidden) return;
@@ -357,7 +373,8 @@ export class Game {
 
   private readonly handleSoundToggle = (event: Event): void => {
     event.stopPropagation();
-    const enable = this.audio.getStatus() !== 'ready';
+    const enable = this.audio.getStatus() === 'blocked' || !this.settings?.values.soundEnabled;
+    this.settings?.setSound(enable);
     this.audio.setEnabled(enable);
     if (enable) this.audio.play('reload');
   };
@@ -365,11 +382,11 @@ export class Game {
   private readonly updateSoundButton = (status: string): void => {
     const button = document.querySelector<HTMLButtonElement>('#sound-toggle');
     if (!button) return;
-    button.textContent = status === 'unsupported' ? 'SOUND · N/A' : status === 'ready' ? 'SOUND · ON' : status === 'muted' ? 'SOUND · OFF' : status === 'blocked' ? 'SOUND · RETRY' : 'SOUND · TAP';
+    button.textContent = status === 'unsupported' ? '设备不支持' : status === 'blocked' ? '点击重试' : this.settings?.values.soundEnabled ? '已开启' : '已关闭';
     button.disabled = status === 'unsupported';
     button.title = status === 'unsupported' ? 'Web Audio is unavailable in this container.' : status === 'blocked' ? 'Playback failed. Tap to retry and check device media volume.' : '';
-    button.setAttribute('aria-pressed', String(status === 'ready'));
-    button.setAttribute('aria-label', status === 'ready' ? 'Mute sound' : 'Enable or retry sound');
+    button.setAttribute('aria-pressed', String(this.settings?.values.soundEnabled ?? true));
+    button.setAttribute('aria-label', this.settings?.values.soundEnabled ? '关闭音效' : '开启音效');
     button.dataset.audioStatus = status;
   };
 
@@ -417,7 +434,7 @@ export class Game {
     this.input.setPointerFallback(true);
     this.capturePlayback = false;
     if (this.state.mode === 'start' || this.state.mode === 'paused') this.setMode('playing');
-    this.hud.showTip('TAP RIGHT TO FIRE · DRAG TO LOOK · HOLD FOR AUTO FIRE', 5.2);
+    this.hud.showTip(this.settings?.values.fireMode === 'button' ? '滑动屏幕转向 · 按射击键开火 · 按住连射' : '点击右侧射击 · 滑动转向 · 按住连射', 5.2);
   }
 
   private beginRound(): void {
@@ -871,7 +888,7 @@ export class Game {
     if (event.wave > 0) this.state.wave = event.wave;
     if (event.type === 'announcement') {
       this.hud.showBanner(`WAVE ${event.wave}`, event.subtitle, event.duration ?? 2.15);
-      this.audio.play(event.wave === 5 ? 'boss' : 'wave');
+      this.audio.play(event.wave === 5 || event.wave === 10 ? 'boss' : 'wave');
     } else if (event.type === 'wave-clear') {
       this.hud.showBanner('WAVE CLEARED', 'CATCH YOUR BREATH · RESTOCKING INK', 2.8);
       this.audio.play('waveClear');

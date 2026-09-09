@@ -27,7 +27,7 @@ The game uses downloaded sound samples, not oscillators, noise generators, or AI
 | Dry fire | scissors-close-01.wav | Empty firearm click |
 | Weapon switch | knife-unsheathe-02.wav | Draw / switch foley |
 | Pickup | coins-shake-01.wav | Supply collection |
-| Enemy fire | paralyzer-discharge-01.wav | Enemy projectile launch |
+| Enemy fire | shots/pistol.wav | Shortened pistol report, 5.5 kHz low-pass and reduced gain; replaces the former electrical discharge |
 | World impact | metal-hammer-hit-01.wav | Bullet and projectile impact |
 | Enemy death | cover-paper-tear-01.wav | Paper-character death accent |
 | Pump | drawer-close-01.wav | Shotgun pump mechanism |
@@ -52,7 +52,7 @@ The script keeps existing prepared files and creates only missing ones. The ship
 
 ## Playback and recovery
 
-Click Start to enable audio. The top-center SOUND button mutes sound, enables it, or retries a blocked attempt with a short reload preview. Device media volume still controls audibility. The web adapter reuses at most six unlocked HTML audio elements. The mini-tool adapter uses one AudioContext, cached decoded AudioBuffers, and at most six simultaneous sources. Playback errors are caught. Leaving the page or pausing stops audio; the next game gesture re-unlocks it. Muting persists across those gestures for the current session. Delayed decode requests are cancelled on pause/mute/disposal and stale shots are dropped instead of played as a backlog.
+Click Start to enable audio. The right-side gear opens settings, including a sound toggle and blocked-playback retry. Device media volume still controls audibility. The web adapter reuses at most six unlocked HTML audio elements. The mini-tool adapter uses one AudioContext, cached decoded AudioBuffers, and at most six simultaneous sources. Playback errors are caught. Leaving the page or pausing stops audio; the next game gesture re-unlocks it. The sound preference is saved locally when storage is available. Delayed decode requests are cancelled on pause/mute/disposal and stale shots are dropped instead of played as a backlog.
 
 ## Mini-tool build and validation
 

@@ -1,6 +1,28 @@
 @import '@fontsource/patrick-hand';
 
 :root{font-family:'Patrick Hand','Chalkboard SE','Comic Sans MS',cursive;color:#27348f;background:#f6f0dc;font-synthesis:none;touch-action:manipulation;--ink:#27348f;--ink-dark:#18246f;--red:#d63b55;--orange:#e79a32;--green:#69b887;--paper:#f6f0dc;--reticle-spread:22px;--damage-strength:.4}
+
+/* Settings share the rotated game shell and stay clear of host navigation. */
+#settings-toggle{position:absolute;z-index:35;top:76px;right:22px;right:calc(22px + var(--safe-area-inset-right,env(safe-area-inset-right,0px)));width:46px;height:46px;display:flex;align-items:center;justify-content:center;padding:0;border:1px solid rgba(39,52,143,.25);border-radius:50%;color:var(--ink);background:rgba(246,240,220,.72);touch-action:manipulation;cursor:pointer}
+#settings-toggle svg{pointer-events:none}
+#settings-toggle:active{background:rgba(39,52,143,.13)}
+#settings-panel{position:absolute;inset:0;top:0;right:0;bottom:0;left:0;z-index:45;display:flex;align-items:center;justify-content:center;background:rgba(24,36,111,.28);font:15px/1.4 system-ui,sans-serif;pointer-events:auto}
+#settings-panel[hidden]{display:none}
+.settings-card{width:420px;max-width:calc(100% - 160px);max-height:calc(100% - 24px);overflow:auto;box-sizing:border-box;padding:16px 22px;background:var(--paper);border:2px solid var(--ink);border-radius:12px;box-shadow:5px 5px 0 rgba(39,52,143,.2);touch-action:pan-y}
+.settings-card header,.settings-row{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:10px}
+.settings-card h2{font-size:20px;margin:0}.settings-card button{min-height:44px;min-width:80px;padding:6px 12px;border:1px solid var(--ink);border-radius:6px;color:var(--ink);background:transparent;font:inherit}
+#settings-panel #sound-toggle{position:static;transform:none;left:auto;top:auto;font:inherit;min-width:90px;background:rgba(39,52,143,.06)}
+.sensitivity-label{display:flex;justify-content:space-between}.sensitivity-label output{color:var(--red);font-variant-numeric:tabular-nums}
+#look-sensitivity{display:block;width:100%;height:44px;margin:0;accent-color:var(--ink);touch-action:none;cursor:ew-resize}
+.settings-help{margin:0 0 8px;font-size:12px;color:#505985}
+.settings-card fieldset{margin:10px 0 8px;padding:0;border:0}.settings-card legend{margin-bottom:5px}
+.settings-card fieldset label{display:flex;align-items:center;min-height:48px;border:1px solid rgba(39,52,143,.3);border-radius:6px;margin-bottom:6px;padding:2px 8px;cursor:pointer}
+.settings-card input[type=radio]{margin:0 12px 0 0;width:20px;height:20px;accent-color:var(--ink)}
+.settings-card small{display:block;font-size:12px;opacity:.78}.settings-card :focus-visible,#settings-toggle:focus-visible{outline:2px solid var(--red);outline-offset:3px}
+#touch-controls .action-fire{display:none;position:absolute;right:198px;bottom:34px;width:82px;height:82px;border:3px solid var(--red);background:rgba(246,240,220,.84);color:var(--red)}
+body[data-fire-mode=button] #touch-controls .action-fire{display:block}
+#touch-controls .action-fire span{font-size:34px;line-height:36px}#touch-controls .action-fire small{font:13px system-ui,sans-serif}
+#touch-controls .action-fire.active{background:var(--red);color:var(--paper);transform:scale(.96)}
 *{box-sizing:border-box}
 html,body,#app{width:100%;height:100%;margin:0;display:block;overflow:hidden;background:var(--paper)}
 body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}

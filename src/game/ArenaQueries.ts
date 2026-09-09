@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { EnemyView } from '../enemies';
 import type { ArenaBuildResult, ArenaCollider, ArenaWaypoint } from '../level';
+import { ColliderGrid } from './ColliderGrid';
 
 const WAYPOINT_REACHED_DISTANCE = 0.78;
 const SAME_LEVEL_TOLERANCE = 1.1;
@@ -29,7 +30,8 @@ export class ArenaQueries {
   private readonly raycaster = new THREE.Raycaster();
   private readonly navigationStates = new WeakMap<THREE.Object3D, NavigationState>();
 
-  constructor(readonly arena: ArenaBuildResult) {}
+  private readonly colliderGrid: ColliderGrid;
+  constructor(readonly arena: ArenaBuildResult) { this.colliderGrid = new ColliderGrid(arena.colliders); }
 
   hasLineOfSight(from: THREE.Vector3, to: THREE.Vector3): boolean {
     const direction = to.clone().sub(from);
@@ -123,7 +125,7 @@ export class ArenaQueries {
     let highest: number | null = null;
     const radius = Math.max(0.12, enemy.collisionRadius * 0.58);
     const maxRise = enemy.kind === 'boss' ? 0.68 : 0.5;
-    for (const collider of this.arena.colliders) {
+    for (const collider of this.colliderGrid.nearby(position.x, position.z, radius)) {
       if (!collider.enabled || collider.category === 'wall' || collider.category === 'column') continue;
       if (!circleOverlaps(collider, position.x, position.z, radius)) continue;
       const top = collider.max.y;
@@ -270,7 +272,8 @@ export class ArenaQueries {
   }
 
   private isEnemyBlocked(enemy: EnemyView, position: THREE.Vector3, stepHeight?: number): boolean {
-    return this.arena.colliders.some((collider) => this.isColliderBlocking(enemy, collider, position, stepHeight));
+    return this.colliderGrid.nearby(position.x, position.z, enemy.collisionRadius)
+      .some((collider) => this.isColliderBlocking(enemy, collider, position, stepHeight));
   }
 
   private projectWaypointToClearance(enemy: EnemyView, waypoint: THREE.Vector3): THREE.Vector3 {
@@ -359,7 +362,7 @@ export class ArenaQueries {
     for (let index = 1; index <= samples; index += 1) {
       const point = from.clone().lerp(to, index / samples);
       point.y = from.y;
-      for (const collider of this.arena.colliders) {
+      for (const collider of this.colliderGrid.nearby(point.x, point.z, enemy.collisionRadius)) {
         if (this.isColliderBlocking(enemy, collider, point)) return collider;
       }
     }
@@ -377,7 +380,7 @@ export class ArenaQueries {
     for (let iteration = 0; iteration < 6 && blocked(result); iteration += 1) {
       let bestOffset: THREE.Vector3 | null = null;
       let bestDistance = Number.POSITIVE_INFINITY;
-      for (const collider of this.arena.colliders) {
+      for (const collider of this.colliderGrid.nearby(result.x, result.z, radius)) {
         if (!collider.enabled || collider.max.y <= result.y + stepHeight) continue;
         if (result.y + collisionHeight <= collider.min.y || result.y >= collider.max.y) continue;
         if (!circleOverlaps(collider, result.x, result.z, radius)) continue;

@@ -61,6 +61,21 @@ export const DEFAULT_WAVES: readonly WaveDefinition[] = [
     spawnInterval: 0.5,
     maxConcurrent: 15,
   },
+  { number: 6, subtitle: 'SECOND DRAFT',
+    composition: [{kind:'grunt',count:8},{kind:'rusher',count:7},{kind:'heavy',count:3},{kind:'marksman',count:2}],
+    spawnInterval: .48, maxConcurrent: 12 },
+  { number: 7, subtitle: 'CROSSFIRE IN THE MARGINS',
+    composition: [{kind:'marksman',count:5},{kind:'grunt',count:7},{kind:'rusher',count:7},{kind:'heavy',count:4}],
+    spawnInterval: .45, maxConcurrent: 13 },
+  { number: 8, subtitle: 'HEAVY INK',
+    composition: [{kind:'heavy',count:6},{kind:'rusher',count:8},{kind:'grunt',count:8},{kind:'marksman',count:4}],
+    spawnInterval: .42, maxConcurrent: 14 },
+  { number: 9, subtitle: 'NO ROOM TO BREATHE',
+    composition: [{kind:'rusher',count:11},{kind:'grunt',count:8},{kind:'heavy',count:6},{kind:'marksman',count:4}],
+    spawnInterval: .4, maxConcurrent: 15 },
+  { number: 10, subtitle: 'THE FINAL DOODLE',
+    composition: [{kind:'boss',count:1},{kind:'heavy',count:7},{kind:'marksman',count:6},{kind:'rusher',count:10},{kind:'grunt',count:8}],
+    spawnInterval: .44, maxConcurrent: 16 },
 ];
 
 function createRandom(seed: number): () => number {
@@ -93,7 +108,7 @@ export class WaveDirector {
   constructor(private readonly options: WaveDirectorOptions) {
     if (options.spawnPoints.length === 0) throw new Error('WaveDirector requires at least one spawn point');
     const definitions = options.definitions ?? DEFAULT_WAVES;
-    if (definitions.length !== 5) throw new Error(`WaveDirector requires exactly five waves; received ${definitions.length}`);
+    if (definitions.length === 0) throw new Error('WaveDirector requires at least one wave');
     this.validateDefinitions(definitions);
     this.random = createRandom(options.seed ?? 0x5c71bb1e);
   }
@@ -330,7 +345,7 @@ export class WaveDirector {
     }
     const finalWave = definitions[definitions.length - 1];
     if (!finalWave?.composition.some((group) => group.kind === 'boss' && group.count >= 1)) {
-      throw new Error('Wave five must include THE DOODLER boss');
+      throw new Error('The final wave must include THE DOODLER boss');
     }
   }
 }
