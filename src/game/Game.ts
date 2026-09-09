@@ -168,6 +168,7 @@ export class Game {
   private qualityScale = 1;
   private footstepIndex = -1;
   private audioWasGrounded = false;
+  private movementAudioPrimed = false;
 
   constructor(readonly canvas: HTMLCanvasElement, options: GameOptions = {}) {
     this.captureMode = options.capture ?? false;
@@ -458,7 +459,8 @@ export class Game {
     this.supplies.reset();
     this.arena.resetBreakables();
     this.lastHit.clear();
-    this.audioWasGrounded = this.player.getSnapshot().grounded;
+    this.audioWasGrounded = false;
+    this.movementAudioPrimed = false;
     this.footstepIndex = -1;
     if (this.deathFlashTimeout !== null) window.clearTimeout(this.deathFlashTimeout);
     this.deathFlashTimeout = null;
@@ -934,6 +936,11 @@ export class Game {
     if (this.state.mode !== 'playing') {
       this.footstepIndex = -1;
       this.audioWasGrounded = player.grounded;
+      return;
+    }
+    if (!this.movementAudioPrimed) {
+      this.audioWasGrounded = player.grounded;
+      if (player.grounded) this.movementAudioPrimed = true;
       return;
     }
     if (!this.audioWasGrounded && player.grounded) this.audio.play('land');

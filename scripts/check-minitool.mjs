@@ -49,8 +49,8 @@ for (const [name, base64] of Object.entries(data)) {
 assert.ok(total <= 512 * 1024);
 const app = readFileSync(resolve(root, 'assets/app.js'), 'utf8');
 const cssFile = files.find((file) => extname(file) === '.css');
-assert.ok(cssFile, 'Missing bundled stylesheet');
-const css = readFileSync(cssFile, 'utf8');
+const css = cssFile ? readFileSync(cssFile, 'utf8') : '';
+assert.match(app, /BB Ink Display/);
 assert.doesNotMatch(`${app}\n${css}`, /(?:url\(|["'`])\/(?:fonts|textures)\//);
 assert.doesNotMatch(app, /createOscillator|new Audio\(|data:audio|blob:audio|\.finally\(/);
 assert.match(app, /decodeAudioData/);

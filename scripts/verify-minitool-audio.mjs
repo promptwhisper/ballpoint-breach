@@ -3,10 +3,9 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
 import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
-const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.woff': 'font/woff', '.json': 'application/json' };
+const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp', '.png': 'image/png', '.woff2': 'font/woff2', '.woff': 'font/woff', '.json': 'application/json' };
 const server = createServer(async (req, res) => {
   try {
     const pathname = new URL(req.url, 'http://localhost').pathname.replace(/^\/nested\//, '/');
@@ -28,7 +27,6 @@ try {
   for (const scenario of [
     { width: 430, height: 956, label: 'portrait-csp' },
     { width: 956, height: 430, label: 'landscape-csp' },
-    { width: 430, height: 956, label: 'offline-file' },
     { width: 430, height: 956, label: 'webkit-alias' },
     { width: 956, height: 430, label: 'session-playback' },
     { width: 430, height: 956, label: 'session-denied' },
@@ -85,11 +83,24 @@ try {
     const page = await context.newPage();
     const errors = [];
     const requests = [];
+    const failedRequests = [];
     page.on('pageerror', (error) => errors.push(error.message));
     page.on('request', (request) => requests.push(request.url()));
+    page.on('requestfailed', (request) => failedRequests.push(`${request.url()} · ${request.failure()?.errorText ?? 'failed'}`));
+    page.on('response', (response) => { if (response.status() >= 400) failedRequests.push(`${response.url()} · ${response.status()}`); });
     page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
-    await page.goto(scenario.label === 'offline-file' ? pathToFileURL(resolve('dist/index.html')).href : `${base}/nested/index.html`);
+    // Packaged XHS resources run under the container origin. Raw file:// is not a
+    // supported rendering host because browsers forbid local images in WebGL.
+    await page.goto(`${base}/nested/index.html`);
     await page.locator('#start-button').waitFor({ state: 'visible' });
+    const fonts = await page.evaluate(async () => {
+      await document.fonts.ready;
+      return {
+        display: document.fonts.check('32px "BB Ink Display"', '破阵十墨'),
+        ui: document.fonts.check('16px "BB WenKai UI"', '设置灵敏度音效'),
+      };
+    });
+    assert.deepEqual(fonts, { display: true, ui: true });
     assert.equal(await page.locator('#audio-check').count(), 0, 'temporary audio diagnostics must not ship');
     assert.equal(await page.evaluate(() => window.__audioQA.contexts.length), 0);
     await page.locator('#start-button').tap();
@@ -99,7 +110,9 @@ try {
       assert.equal(await page.evaluate(() => window.__SCRIBBLE_SIEGE__.snapshot().mode), 'playing');
     } else {
       await page.waitForFunction(() => window.__audioQA.decodes === 25 && document.querySelector('#sound-toggle').dataset.audioStatus === 'ready');
-      assert.equal(await page.evaluate(() => window.__audioQA.starts.length), 0);
+      const initialStarts = await page.evaluate(() => window.__audioQA.starts);
+      assert.ok(initialStarts.length <= 1, 'audio unlock must not create extra playback');
+      if (initialStarts[0]) assert.ok(Math.abs(initialStarts[0].duration - 1.2) < 0.04, `only the opening-wave cue may play after unlock: ${JSON.stringify(initialStarts)}`);
       if (scenario.label === 'session-playback') assert.equal(await page.evaluate(() => navigator.audioSession.type), 'playback');
       await page.keyboard.down('w');
       await page.waitForTimeout(1250);
@@ -140,6 +153,7 @@ try {
     assert.ok(result.maxVoices <= 6);
     assert.deepEqual(result.unhandled, []);
     assert.deepEqual(errors, []);
+    assert.deepEqual(failedRequests, []);
     assert.ok(!requests.some((url) => /\.(mp3|wav|ogg)(?:$|\?)/.test(url) || /^(blob:|data:audio)/.test(url)));
     console.log(JSON.stringify({ scenario: scenario.label, ...result, mediaRequests: 0, errors }));
     await context.close();

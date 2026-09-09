@@ -49,8 +49,12 @@ export default defineConfig(({ mode }) => {
           this.emitFile({ type: 'asset', fileName, source: readFileSync(new URL(`./${sourcePath}`, import.meta.url)) });
         }
         for (const output of Object.values(bundle)) {
-          if (output.type !== 'asset' || !output.fileName.endsWith('.css') || typeof output.source !== 'string') continue;
-          output.source = output.source.replace(/url\(\/fonts\//g, 'url(../fonts/');
+          if (output.type === 'asset' && output.fileName.endsWith('.css') && typeof output.source === 'string') {
+            output.source = output.source.replace(/url\(\/fonts\//g, 'url(../fonts/');
+          } else if (output.type === 'chunk') {
+            // IIFE builds inline CSS into app.js; inline style URLs resolve from index.html.
+            output.code = output.code.replace(/url\(\/fonts\//g, 'url(./fonts/');
+          }
         }
       },
       transformIndexHtml(html) {

@@ -43,10 +43,10 @@ distortion, or heavy shadow. The Ink Shader was not changed.
 
 | Runtime file | Bytes | Purpose |
 | --- | ---: | --- |
-| `public/fonts/bb-ink-display-cjk.woff2` | 91,616 | Long Cang Chinese UI glyph subset |
+| `public/fonts/bb-ink-display-cjk.woff2` | 120,832 | Long Cang Chinese UI glyph subset |
 | `public/fonts/bb-wenkai-ui-latin.woff2` | 26,036 | LXGW WenKai Latin and common symbols |
-| `public/fonts/bb-wenkai-ui-cjk.woff2` | 57,088 | LXGW WenKai Chinese UI glyph subset |
-| **Total** | **174,740** | Local runtime font payload |
+| `public/fonts/bb-wenkai-ui-cjk.woff2` | 74,748 | LXGW WenKai Chinese UI glyph subset |
+| **Total** | **221,616** | Local runtime font payload |
 
 All faces are local WOFF2 files with `font-display: swap`. Full source TTF files
 are kept under `assets-source/fonts/` for reproducibility, not loaded at runtime.

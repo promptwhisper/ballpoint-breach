@@ -53,8 +53,7 @@ npm run build
 | Q | Grapple an enemy or anchor |
 | Escape | Release pointer and pause |
 
-Click the start button to acquire pointer lock. A paused game resumes when the arena is clicked again.
-If the browser rejects Pointer Lock, the game automatically continues in unlocked fallback mode: move the cursor to look, use the same keyboard/mouse controls, and press Escape to pause.
+Click or tap the start button to enter the arena. This mini-tool branch uses unlocked cursor/touch controls so it works inside embedded WebViews. On phones, use the circular movement area on the left; drag the playfield to look; tap or hold the right side to fire. The settings button can switch to a dedicated firing button and adjust look sensitivity.
 
 ## Game loop
 
@@ -106,10 +105,12 @@ can aim while the firing button is held. Semi-automatic weapons retain their
 existing trigger behavior.
 
 Build the upload artifact with `npm run build:minitool`, then ZIP the contents
-of `dist/`. The package allowlist check and sampled-audio verification still
-apply. `scripts/verify-settings.mjs` expects the built directory served at
-`http://127.0.0.1:8912/` and exercises portrait, landscape, pause, persistence,
-aimed firing, multi-touch holding, and touch cancellation.
+of `dist/`. The mini-tool build embeds sampled sounds in JavaScript, emits the
+V5 ink textures and Chinese font subsets with relative paths, and rejects
+unsupported upload extensions. `scripts/verify-settings.mjs` expects the built directory served at
+`http://127.0.0.1:8912/` by default; set `QA_BASE_URL` to use another preview address. It exercises
+portrait, landscape, pause, persistence, aimed firing, multi-touch holding, and touch cancellation,
+and writes screenshots to a temporary directory outside the repository.
 
 The host keeps simulation and visuals separate: weapons emit hitscan/melee requests, enemies emit attacks and lifecycle events, and `Game` resolves those requests against the shared arena queries.
 
@@ -133,7 +134,7 @@ Viewmodels render on a dedicated camera layer in both styles, so they preserve s
 
 ## QA modes
 
-`?capture=1` starts an unlocked, deterministic visual-review run. `?capture=1&stress=1` adds 20 active enemies for a bounded performance check. `?capture=1&ink=1` triggers a deterministic reference-style death after the opening banner for multi-timepoint visual review. `?capture=1&view=rear` and `view=west` expose the remote routes for multi-view geometry review. These modes do not replace the normal pointer-lock game.
+`?capture=1` starts an unlocked, deterministic visual-review run. `?capture=1&stress=1` adds 20 active enemies for a bounded performance check. `?capture=1&ink=1` triggers a deterministic reference-style death after the opening banner for multi-timepoint visual review. `?capture=1&view=rear` and `view=west` expose the remote routes for multi-view geometry review. These modes do not replace the normal touch or unlocked mouse controls.
 
 Style and QA parameters compose, so matching before/after captures can use:
 

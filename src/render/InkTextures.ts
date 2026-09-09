@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 
 function inkAsset(name: string): string {
-  return `${import.meta.env.BASE_URL}textures/ink/${name}`;
+  const path = `./textures/ink/${name}`;
+  return typeof document === 'undefined' ? path : new URL(path, document.baseURI).href;
 }
 
 function fallbackTexture(value: number): THREE.DataTexture {
@@ -17,7 +18,11 @@ function fallbackTexture(value: number): THREE.DataTexture {
 
 function loadInkTexture(path: string, fallback: number): THREE.Texture {
   if (typeof document === 'undefined') return fallbackTexture(fallback);
-  const texture = new THREE.TextureLoader().load(path);
+  const loader = new THREE.TextureLoader();
+  // Ink assets ship beside the page. Avoid adding a CORS attribute so embedded
+  // WebViews can load those same-origin package files without extra fetch modes.
+  loader.crossOrigin = undefined as unknown as string;
+  const texture = loader.load(path);
   // Mirroring hides hard joins without changing the scanned brush character.
   texture.wrapS = THREE.MirroredRepeatWrapping;
   texture.wrapT = THREE.MirroredRepeatWrapping;

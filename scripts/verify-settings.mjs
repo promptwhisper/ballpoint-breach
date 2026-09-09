@@ -1,17 +1,20 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const browser = await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true,args:['--enable-unsafe-swiftshader']});
-mkdirSync('docs/screenshots/settings', {recursive:true});
+const outputDirectory = process.env.QA_OUTPUT_DIR || '/tmp/ballpoint-breach-ink-xhs-settings';
+const baseUrl = process.env.QA_BASE_URL || 'http://127.0.0.1:8912/';
+mkdirSync(outputDirectory, {recursive:true});
 try {
   for (const [width,height] of [[956,430],[430,956]]) {
     const context = await browser.newContext({viewport:{width,height},hasTouch:true});
     const page = await context.newPage();
     const errors=[];
     page.on('pageerror',e=>errors.push(e.message));
-    await page.goto('http://127.0.0.1:8912/');
+    await page.goto(baseUrl);
     const mode = () => page.evaluate(()=>window.__SCRIBBLE_SIEGE__.snapshot().mode);
     const ammo = async () => Number(await page.locator('[data-hud="ammo"]').textContent());
     await page.locator('#start-button').tap();
@@ -47,7 +50,7 @@ try {
     assert.equal(await ammo(),pausedAmmo,'settings cannot fire');
     const bounds=await page.locator('.settings-card').boundingBox();
     assert.ok(bounds.x>=0 && bounds.y>=0 && bounds.x+bounds.width<=width+1 && bounds.y+bounds.height<=height+1,JSON.stringify(bounds));
-    await page.screenshot({path:`docs/screenshots/settings/panel-${width}.png`});
+    await page.screenshot({path:join(outputDirectory,`panel-${width}.png`)});
     await page.locator('#settings-close').tap();
     assert.equal(await mode(),'playing');
     assert.ok(await page.locator('.action-fire').isVisible());
@@ -75,7 +78,7 @@ try {
     await page.waitForTimeout(200);
     assert.equal(await ammo(),released,'cancel stops firing');
     await page.locator('.action-aim').tap();
-    await page.screenshot({path:`docs/screenshots/settings/fire-${width}.png`});
+    await page.screenshot({path:join(outputDirectory,`fire-${width}.png`)});
     await page.reload();
     await page.locator('#settings-toggle').tap();
     assert.equal(await page.locator('#sensitivity-value').textContent(),'3.0 倍');

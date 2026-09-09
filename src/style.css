@@ -570,7 +570,7 @@ html[data-style="ink"] .settings-card{
   box-shadow:8px 9px 0 rgba(42,44,42,.14);font-family:var(--font-ui);
 }
 html[data-style="ink"] .settings-card::before{
-  content:"设";position:absolute;right:18px;top:12px;width:30px;height:30px;display:grid;place-items:center;
+  content:"设";position:absolute;right:116px;top:12px;width:30px;height:30px;display:grid;place-items:center;
   border:1px solid rgba(159,59,50,.78);color:#9f3b32;font:20px/1 var(--font-ink-display);opacity:.62;
 }
 html[data-style="ink"] .settings-card h2,

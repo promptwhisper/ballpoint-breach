@@ -178,6 +178,7 @@ test('doodle material exposes bounded variation, angle, and paper grain controls
 test('ink material exposes bounded wash controls and surface-stable pattern spaces', () => {
   const worldMaterial = new DoodleMaterial({
     visualStyle: 'ink',
+    inkVersion: 'v2',
     patternSpace: 'world',
     washBias: 4,
     washStrength: 9,
@@ -186,7 +187,7 @@ test('ink material exposes bounded wash controls and surface-stable pattern spac
     dryBrushStrength: -1,
     granulationStrength: 4,
   });
-  const movingMaterial = new DoodleMaterial({ visualStyle: 'ink' });
+  const movingMaterial = new DoodleMaterial({ visualStyle: 'ink', inkVersion: 'v2' });
   try {
     assert.equal(worldMaterial.visualStyle, 'ink');
     assert.equal(worldMaterial.isInkWashMaterial, true);
