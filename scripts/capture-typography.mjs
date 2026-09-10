@@ -82,8 +82,8 @@ try {
       display: fontOf('#overlay-ink-title'),
       englishTitle: fontOf('#overlay-title'),
       bodyCopy: fontOf('#overlay-copy'),
-      controls: fontOf('.controls-grid'),
-      number: fontOf('.controls-grid b'),
+      ui: fontOf('.settings-help'),
+      number: fontOf('.hud-health b'),
       longCangSignature,
       systemSignature,
     };
@@ -113,9 +113,6 @@ try {
     document.querySelector('.eyebrow').textContent = '第一章 · 禁区';
     document.querySelector('#overlay-copy').textContent = '暂停 · 胜 · 败';
     document.querySelector('#start-button').textContent = '进入旧城禁区';
-    for (const [index, item] of [...document.querySelectorAll('.controls-grid span')].entries()) {
-      item.textContent = `第${'一二三四五'[index % 5]} · 破阵`;
-    }
   });
   await menuPage.screenshot({ path: '/tmp/ballpoint-breach-font-all-display.png' });
 

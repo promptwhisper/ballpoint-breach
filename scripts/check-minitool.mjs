@@ -32,6 +32,7 @@ for (const required of [
 const html = readFileSync(resolve(root, 'index.html'), 'utf8');
 assert.doesNotMatch(html, /type=["']module|\son\w+=|<script[^>]*>\s*[^\s<]/i);
 assert.doesNotMatch(html, /(?:src|href)=["']\//i);
+assert.doesNotMatch(html, /controls-grid|W\s*A\s*S\s*D|上档键|鼠标(?:左|右)键|退出键/);
 assert.equal(files.filter((file) => extname(file) === '.html').length, 1);
 assert.ok(html.indexOf('./audio-data.js') < html.indexOf('./assets/app.js'));
 const scope = { window: {} };

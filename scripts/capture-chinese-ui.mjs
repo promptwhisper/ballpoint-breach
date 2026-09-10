@@ -15,8 +15,7 @@ try {
   const screenshot = async name => page.screenshot({ path: resolve(`docs/screenshots/ink-study/chinese-ui-${name}.png`) });
   const verifyCopy = async () => {
     const text = await page.locator('body').innerText();
-    // Physical keyboard legends are keys, not English prose.
-    assert.doesNotMatch(text.replace(/\b[WASDQR]\b/g, ''), /[a-zA-Z]/, text);
+    assert.doesNotMatch(text, /[a-zA-Z]/, text);
   };
   await verifyCopy();
   const typography = await page.evaluate(() => {
@@ -25,13 +24,13 @@ try {
       brush: ['#overlay-ink-title', '#overlay-title', '#overlay-copy', '#start-button',
         '.hud-wave strong', '.hud-weapons>strong', '.hud-weapons li>span', '#context-tip',
         '#wave-banner-title', '#wave-banner-subtitle'].map(family),
-      controls: family('.controls-grid'),
+      ui: family('.settings-help'),
       ammo: family('.hud-ammo strong'),
       health: family('.hud-health b'),
     };
   });
   for (const family of typography.brush) assert.ok(family.startsWith('"BB Ink Display"'), family);
-  assert.ok(typography.controls.startsWith('"BB WenKai UI"'));
+  assert.ok(typography.ui.startsWith('"BB WenKai UI"'));
   assert.ok(!typography.ammo.includes('BB Ink Display') && !typography.health.includes('BB Ink Display'));
   await screenshot('menu');
   await page.locator('#start-button').click();
