@@ -56,6 +56,7 @@ const game = (() => {
       katanaReviewVariant,
       renderSize: record ? { width: 1920, height: 952 } : undefined,
       reviewView,
+      forcePointerFallback: import.meta.env.MODE === 'minitool',
     });
   } catch (error) {
     const overlay = document.querySelector<HTMLElement>('#game-overlay');

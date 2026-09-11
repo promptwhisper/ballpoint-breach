@@ -164,12 +164,16 @@ export class InputManager {
     });
   }
 
+  requestPointerLock(): Promise<boolean> {
+    return attemptPointerLock(this.canvas);
+  }
+
   get pointerLocked(): boolean {
-    return false;
+    return document.pointerLockElement === this.canvas;
   }
 
   get controlsActive(): boolean {
-    return this.pointerFallback;
+    return this.pointerLocked || this.pointerFallback;
   }
 
   get usingPointerFallback(): boolean {

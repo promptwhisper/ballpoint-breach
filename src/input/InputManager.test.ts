@@ -75,6 +75,38 @@ test('right interaction zone follows the logical landscape axis', () => {
   assert.equal(isRightInteractionZone(200, 400, 430, 956), false);
 });
 
+test('pointer lock activates desktop look and preserves large relative mouse deltas', () => {
+  const oldWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  const oldDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  const host = Object.assign(new EventTarget(), { innerWidth: 1280, innerHeight: 720 });
+  const canvas = new EventTarget();
+  const pointerDocument = {
+    pointerLockElement: canvas,
+    querySelector: () => null,
+    querySelectorAll: () => [],
+  };
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: host });
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: pointerDocument });
+  const input = new InputManager(canvas as HTMLCanvasElement);
+  try {
+    const move = new Event('mousemove');
+    Object.defineProperties(move, {
+      movementX: { value: 960 },
+      movementY: { value: -75 },
+    });
+    host.dispatchEvent(move);
+    const frame = input.consumeFrame();
+    assert.equal(frame.pointerLocked, true);
+    assert.equal(frame.controlsActive, true);
+    assert.equal(frame.lookX, 960);
+    assert.equal(frame.lookY, -75);
+  } finally {
+    input.dispose();
+    if (oldWindow) Object.defineProperty(globalThis, 'window', oldWindow); else Reflect.deleteProperty(globalThis, 'window');
+    if (oldDocument) Object.defineProperty(globalThis, 'document', oldDocument); else Reflect.deleteProperty(globalThis, 'document');
+  }
+});
+
 test('touch sensitivity scales both axes and keeps portrait rotation correct', () => {
   const oldWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
   const oldDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');

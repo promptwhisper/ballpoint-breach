@@ -56,6 +56,7 @@ export interface GameOptions {
   katanaReviewVariant?: KatanaSlashVariant;
   renderSize?: Readonly<{ width: number; height: number }>;
   reviewView?: 'rear' | 'west';
+  forcePointerFallback?: boolean;
 }
 
 export interface PublicGameSnapshot {
@@ -139,6 +140,7 @@ export class Game {
   private readonly katanaReviewVariant: KatanaSlashVariant;
   private readonly renderSize?: Readonly<{ width: number; height: number }>;
   private readonly reviewView?: 'rear' | 'west';
+  private readonly forcePointerFallback: boolean;
   private requestId = 0;
   private previousTime = performance.now();
   private roundStarted = false;
@@ -159,6 +161,8 @@ export class Game {
   private demoReelSegment = -1;
   private demoSpawnSerial = 0;
   private controlRequest = 0;
+  private pointerLockRequested = false;
+  private wasPointerLocked = false;
   private deathFlashTimeout: number | null = null;
   private readonly inkOutline = ACTIVE_VISUAL_STYLE === 'ink' && ACTIVE_INK_VERSION !== 'current'
     ? new InkOutline() : null;
@@ -185,6 +189,7 @@ export class Game {
     this.katanaReviewVariant = options.katanaReviewVariant ?? 'forward';
     this.renderSize = options.renderSize;
     this.reviewView = options.reviewView;
+    this.forcePointerFallback = options.forcePointerFallback ?? false;
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
@@ -321,6 +326,8 @@ export class Game {
   }
 
   dispose(): void {
+    this.controlRequest += 1;
+    this.pointerLockRequested = false;
     this.settings?.dispose();
     cancelAnimationFrame(this.requestId);
     if (this.deathFlashTimeout !== null) window.clearTimeout(this.deathFlashTimeout);
@@ -328,6 +335,8 @@ export class Game {
     this.hud.dispose();
     window.removeEventListener('resize', this.resize);
     document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    document.removeEventListener('pointerlockchange', this.handlePointerLockChange);
+    if (document.pointerLockElement === this.canvas) void document.exitPointerLock();
     this.canvas.removeEventListener('webglcontextlost', this.handleContextLost);
     this.canvas.removeEventListener('webglcontextrestored', this.handleContextRestored);
     this.hud.startButton.removeEventListener('click', this.handleStartClick);
@@ -346,8 +355,14 @@ export class Game {
 
   private installEvents(): void {
     this.settings = new SettingsPanel(this.input, () => {
-      this.resumeAfterSettings = this.state.mode === 'playing';
-      if (this.resumeAfterSettings) this.setMode('paused');
+      this.resumeAfterSettings = this.state.mode === 'playing' || this.pointerLockRequested;
+      if (this.resumeAfterSettings) {
+        this.controlRequest += 1;
+        this.pointerLockRequested = false;
+        this.input.setPointerFallback(false);
+        if (document.pointerLockElement === this.canvas) void document.exitPointerLock();
+        this.setMode('paused');
+      }
     }, () => {
       if (this.resumeAfterSettings && !document.hidden && this.state.mode === 'paused') {
         this.audio.resume(); this.requestGameplayControl();
@@ -357,6 +372,7 @@ export class Game {
     if (!this.settings.values.soundEnabled) this.audio.setEnabled(false);
     window.addEventListener('resize', this.resize);
     document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    document.addEventListener('pointerlockchange', this.handlePointerLockChange);
     this.canvas.addEventListener('webglcontextlost', this.handleContextLost);
     this.canvas.addEventListener('webglcontextrestored', this.handleContextRestored);
     this.hud.startButton.addEventListener('click', this.handleStartClick);
@@ -438,12 +454,56 @@ export class Game {
   };
 
   private requestGameplayControl(): void {
-    this.controlRequest += 1;
-    this.input.setPointerFallback(true);
-    this.capturePlayback = false;
-    if (this.state.mode === 'start' || this.state.mode === 'paused') this.setMode('playing');
-    this.hud.showTip(this.settings?.values.fireMode === 'button' ? '滑动屏幕转向 · 按射击键开火 · 按住连射' : '点击右侧射击 · 滑动转向 · 按住连射', 5.2);
+    const request = ++this.controlRequest;
+    if (this.forcePointerFallback) {
+      this.pointerLockRequested = false;
+      this.input.setPointerFallback(true);
+      this.capturePlayback = false;
+      if (this.state.mode === 'start' || this.state.mode === 'paused') this.setMode('playing');
+      this.hud.showTip(this.settings?.values.fireMode === 'button' ? '滑动屏幕转向 · 按射击键开火 · 按住连射' : '点击右侧射击 · 滑动转向 · 按住连射', 5.2);
+      return;
+    }
+
+    this.pointerLockRequested = true;
+    this.input.setPointerFallback(false);
+    void this.input.requestPointerLock().then((locked) => {
+      if (request !== this.controlRequest) return;
+      if (locked) {
+        this.wasPointerLocked = true;
+        this.input.setPointerFallback(false);
+        this.capturePlayback = false;
+        if (this.state.mode === 'start' || this.state.mode === 'paused') this.setMode('playing');
+        this.hud.showTip('鼠标转向 · 左键射击 · ESC 暂停', 4.2);
+        return;
+      }
+      if (this.state.mode !== 'start' && this.state.mode !== 'paused') return;
+      this.pointerLockRequested = false;
+      this.input.setPointerFallback(true);
+      this.capturePlayback = false;
+      this.setMode('playing');
+      this.hud.showTip('浏览器未能锁定鼠标 · 移动鼠标转向 · ESC 暂停', 5.2);
+    });
   }
+
+  private readonly handlePointerLockChange = (): void => {
+    if (this.forcePointerFallback) return;
+    const locked = document.pointerLockElement === this.canvas;
+    const wasLocked = this.wasPointerLocked;
+    this.wasPointerLocked = locked;
+    if (locked) {
+      if (!this.pointerLockRequested || document.hidden) {
+        this.wasPointerLocked = false;
+        void document.exitPointerLock();
+        return;
+      }
+      this.input.setPointerFallback(false);
+      this.capturePlayback = false;
+      if (this.state.mode === 'start' || this.state.mode === 'paused') this.setMode('playing');
+    } else if (wasLocked) {
+      this.pointerLockRequested = false;
+      if (this.state.mode === 'playing' && !this.capturePlayback) this.setMode('paused');
+    }
+  };
 
   private beginRound(): void {
     this.state.reset();
@@ -520,7 +580,9 @@ export class Game {
     this.weapons.setEnabled(controlActive);
     if (input.pausePressed && !this.capturePlayback) {
       this.controlRequest += 1;
+      this.pointerLockRequested = false;
       this.input.setPointerFallback(false);
+      if (document.pointerLockElement === this.canvas) void document.exitPointerLock();
       this.setMode('paused');
       return;
     }
@@ -959,7 +1021,9 @@ export class Game {
   private finish(mode: 'defeat' | 'victory'): void {
     if (this.state.mode === mode) return;
     this.controlRequest += 1;
+    this.pointerLockRequested = false;
     this.input.setPointerFallback(false);
+    if (document.pointerLockElement === this.canvas) void document.exitPointerLock();
     this.capturePlayback = false;
     this.setMode(mode);
     this.weapons.setTrigger(false);
@@ -1186,6 +1250,13 @@ export class Game {
   private readonly handleVisibilityChange = (): void => {
     this.pageVisible = !document.hidden;
     if (!this.pageVisible) {
+      if (!this.forcePointerFallback && (this.pointerLockRequested || document.pointerLockElement === this.canvas)) {
+        this.controlRequest += 1;
+        this.pointerLockRequested = false;
+        this.input.setPointerFallback(false);
+        if (document.pointerLockElement === this.canvas) void document.exitPointerLock();
+        if (this.state.mode === 'playing' && !this.capturePlayback) this.setMode('paused');
+      }
       this.audio.suspend();
       cancelAnimationFrame(this.requestId);
       this.requestId = 0;
