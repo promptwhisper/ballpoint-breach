@@ -271,10 +271,10 @@ export function firearmAftermathProfile(weaponId: FirearmEffectWeapon): FirearmA
 }
 
 const PLAYER_INK_TRAILS: Readonly<Record<FirearmEffectWeapon, PlayerInkTrailProfile>> = Object.freeze({
-  rifle: Object.freeze({ trailCount: 1, strokeLength: 1.25, travelSpeed: 92, width: 0.075, lifetime: 0.09, opacity: 0.34 }),
-  shotgun: Object.freeze({ trailCount: 3, strokeLength: 0.78, travelSpeed: 66, width: 0.08, lifetime: 0.1, opacity: 0.28 }),
-  revolver: Object.freeze({ trailCount: 1, strokeLength: 1.55, travelSpeed: 78, width: 0.09, lifetime: 0.105, opacity: 0.37 }),
-  sniper: Object.freeze({ trailCount: 1, strokeLength: 2.5, travelSpeed: 124, width: 0.115, lifetime: 0.13, opacity: 0.42 }),
+  rifle: Object.freeze({ trailCount: 1, strokeLength: 1.25, travelSpeed: 92, width: 0.095, lifetime: 0.09, opacity: 0.76 }),
+  shotgun: Object.freeze({ trailCount: 3, strokeLength: 0.78, travelSpeed: 66, width: 0.1, lifetime: 0.1, opacity: 0.62 }),
+  revolver: Object.freeze({ trailCount: 1, strokeLength: 1.55, travelSpeed: 78, width: 0.115, lifetime: 0.105, opacity: 0.82 }),
+  sniper: Object.freeze({ trailCount: 1, strokeLength: 2.5, travelSpeed: 124, width: 0.145, lifetime: 0.13, opacity: 0.86 }),
 });
 
 export function playerInkTrailProfile(weaponId: FirearmEffectWeapon): PlayerInkTrailProfile {
@@ -371,6 +371,7 @@ function makeShotTrailTexture(): THREE.CanvasTexture {
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = '#ffffff';
   drawTaperedStroke(context, 4, 29, 252, 32, 12, 1.2, -4, 0.88);
+  drawTaperedStroke(context, 7, 30, 247, 32, 6.4, 0.75, -1.5, 0.96);
   drawTaperedStroke(context, 12, 43, 224, 39, 3.2, 0.35, 4, 0.36);
   drawTaperedStroke(context, 32, 17, 198, 22, 1.7, 0.2, -2, 0.24);
   for (let index = 0; index < 7; index += 1) {
@@ -385,6 +386,9 @@ function makeShotTrailTexture(): THREE.CanvasTexture {
     );
   }
   cutDryBrushGaps(context, 1103, 130, 32, 236, 44, 38);
+  drawRaggedIsland(context, 1199, 238, 32, 7.5, 4.8, 0.94);
+  drawDroplet(context, 224, 23, 1.8, 1.7, -0.35, 0.72);
+  drawDroplet(context, 218, 41, 1.25, 1.4, 0.42, 0.58);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
@@ -1006,7 +1010,7 @@ export class EffectPool {
     centerStart.addScaledVector(side, lateralStart);
     centerEnd.addScaledVector(side, lateralEnd);
     const halfStart = profile.width * (0.46 + deterministic(shotId, 1153) * 0.12);
-    const halfEnd = profile.width * (0.12 + deterministic(shotId, 1163) * 0.09);
+    const halfEnd = profile.width * (0.2 + deterministic(shotId, 1163) * 0.11);
     const a = centerStart.clone().addScaledVector(side, -halfStart);
     const b = centerEnd.clone().addScaledVector(side, -halfEnd);
     const c = centerEnd.clone().addScaledVector(side, halfEnd);

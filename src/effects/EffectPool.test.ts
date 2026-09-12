@@ -49,8 +49,9 @@ test('player ink trails stay brief and sparse while preserving weapon character'
   assert.ok(revolver.strokeLength > rifle.strokeLength);
   assert.ok(shotgun.strokeLength < rifle.strokeLength);
   assert.ok(sniper.travelSpeed > rifle.travelSpeed);
+  assert.ok(rifle.opacity >= 0.7);
   for (const profile of [rifle, shotgun, revolver, sniper]) {
-    assert.ok(profile.opacity <= 0.42);
+    assert.ok(profile.opacity <= 0.9);
     assert.ok(profile.strokeLength <= 2.5);
   }
 });
