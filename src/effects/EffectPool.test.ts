@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DEATH_INK_STYLE, firearmAftermathProfile } from './EffectPool';
+import { DEATH_INK_STYLE, firearmAftermathProfile, playerInkTrailProfile } from './EffectPool';
 
 test('rifle ejects the reference three-shard case burst immediately with a two-puff muzzle cloud', () => {
   const profile = firearmAftermathProfile('rifle');
@@ -31,6 +31,28 @@ test('revolver retains cases in its cylinder during firing', () => {
   assert.ok(profile.muzzleShardCount > 0);
   assert.equal(profile.casingLifetime, 0);
   assert.equal(profile.smokeCount, 1);
+});
+
+test('player ink trails stay brief and sparse while preserving weapon character', () => {
+  const rifle = playerInkTrailProfile('rifle');
+  const shotgun = playerInkTrailProfile('shotgun');
+  const revolver = playerInkTrailProfile('revolver');
+  const sniper = playerInkTrailProfile('sniper');
+
+  assert.equal(rifle.trailCount, 1);
+  assert.equal(shotgun.trailCount, 3);
+  assert.equal(revolver.trailCount, 1);
+  assert.equal(sniper.trailCount, 1);
+  assert.ok(rifle.lifetime < 0.1);
+  assert.ok(sniper.lifetime <= 0.14);
+  assert.ok(sniper.strokeLength > revolver.strokeLength);
+  assert.ok(revolver.strokeLength > rifle.strokeLength);
+  assert.ok(shotgun.strokeLength < rifle.strokeLength);
+  assert.ok(sniper.travelSpeed > rifle.travelSpeed);
+  for (const profile of [rifle, shotgun, revolver, sniper]) {
+    assert.ok(profile.opacity <= 0.42);
+    assert.ok(profile.strokeLength <= 2.5);
+  }
 });
 
 test('wall blood is composed from broken impact, rivulet, and satellite layers', () => {

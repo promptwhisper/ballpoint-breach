@@ -36,6 +36,19 @@ interface SmokeSlot {
   baseScale: number;
 }
 
+interface ShotTrailSlot {
+  mesh: THREE.Mesh;
+  geometry: THREE.BufferGeometry;
+  material: THREE.MeshBasicMaterial;
+  positions: Float32Array;
+  life: number;
+  maxLife: number;
+  baseOpacity: number;
+  direction: THREE.Vector3;
+  speed: number;
+  travelRemaining: number;
+}
+
 interface GoreSlot {
   mesh: THREE.Mesh;
   face: THREE.Group;
@@ -90,6 +103,7 @@ export interface EffectPoolSnapshot {
   debris: number;
   casings: number;
   smoke: number;
+  shotTrails: number;
   gore: number;
   decals: number;
 }
@@ -135,6 +149,15 @@ export interface FirearmAftermathProfile {
   readonly smokeCount: number;
   readonly smokeScale: number;
   readonly smokeLifetime: number;
+}
+
+export interface PlayerInkTrailProfile {
+  readonly trailCount: number;
+  readonly strokeLength: number;
+  readonly travelSpeed: number;
+  readonly width: number;
+  readonly lifetime: number;
+  readonly opacity: number;
 }
 
 interface DeathPieceSpec {
@@ -247,6 +270,17 @@ export function firearmAftermathProfile(weaponId: FirearmEffectWeapon): FirearmA
   return FIREARM_AFTERMATH[weaponId];
 }
 
+const PLAYER_INK_TRAILS: Readonly<Record<FirearmEffectWeapon, PlayerInkTrailProfile>> = Object.freeze({
+  rifle: Object.freeze({ trailCount: 1, strokeLength: 1.25, travelSpeed: 92, width: 0.075, lifetime: 0.09, opacity: 0.34 }),
+  shotgun: Object.freeze({ trailCount: 3, strokeLength: 0.78, travelSpeed: 66, width: 0.08, lifetime: 0.1, opacity: 0.28 }),
+  revolver: Object.freeze({ trailCount: 1, strokeLength: 1.55, travelSpeed: 78, width: 0.09, lifetime: 0.105, opacity: 0.37 }),
+  sniper: Object.freeze({ trailCount: 1, strokeLength: 2.5, travelSpeed: 124, width: 0.115, lifetime: 0.13, opacity: 0.42 }),
+});
+
+export function playerInkTrailProfile(weaponId: FirearmEffectWeapon): PlayerInkTrailProfile {
+  return PLAYER_INK_TRAILS[weaponId];
+}
+
 function deterministic(index: number, salt: number): number {
   const value = Math.sin(index * 91.733 + salt * 37.719) * 43758.5453;
   return value - Math.floor(value);
@@ -321,6 +355,36 @@ function makeMuzzleTexture(): THREE.CanvasTexture {
   context.fillStyle = '#984138';
   drawRaggedIsland(context, 929, 55, 65, 11, 10, 0.82);
   cutDryBrushGaps(context, 937, 76, 63, 78, 54, 19);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  return texture;
+}
+
+function makeShotTrailTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 64;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('2D canvas is unavailable');
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = '#ffffff';
+  drawTaperedStroke(context, 4, 29, 252, 32, 12, 1.2, -4, 0.88);
+  drawTaperedStroke(context, 12, 43, 224, 39, 3.2, 0.35, 4, 0.36);
+  drawTaperedStroke(context, 32, 17, 198, 22, 1.7, 0.2, -2, 0.24);
+  for (let index = 0; index < 7; index += 1) {
+    drawDroplet(
+      context,
+      38 + deterministic(index, 1061) * 194,
+      18 + deterministic(index, 1063) * 31,
+      0.8 + deterministic(index, 1069) * 1.8,
+      1.2 + deterministic(index, 1087) * 1.6,
+      deterministic(index, 1091) * Math.PI,
+      0.2 + deterministic(index, 1093) * 0.32,
+    );
+  }
+  cutDryBrushGaps(context, 1103, 130, 32, 236, 44, 38);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
@@ -679,12 +743,14 @@ export class EffectPool {
   private readonly debrisSlots: DebrisSlot[] = [];
   private readonly casingSlots: CasingSlot[] = [];
   private readonly smokeSlots: SmokeSlot[] = [];
+  private readonly shotTrailSlots: ShotTrailSlot[] = [];
   private readonly goreSlots: GoreSlot[] = [];
   private readonly decalSlots: DecalSlot[] = [];
   private readonly pendingSplats: PendingSplat[] = [];
   private readonly pendingCasings: PendingCasing[] = [];
   private readonly burstTexture: THREE.CanvasTexture;
   private readonly muzzleTexture: THREE.CanvasTexture;
+  private readonly shotTrailTexture: THREE.CanvasTexture;
   private readonly splatTextures: Readonly<Record<SplatTextureKind, readonly THREE.CanvasTexture[]>> = {
     'wall-impact': [0, 1, 2, 3].map((seed) => makeSplatTexture(seed, 'wall-impact')),
     'wall-drip': [0, 1, 2, 3].map((seed) => makeSplatTexture(seed, 'wall-drip')),
@@ -702,6 +768,7 @@ export class EffectPool {
   private debrisCursor = 0;
   private casingCursor = 0;
   private smokeCursor = 0;
+  private shotTrailCursor = 0;
   private goreCursor = 0;
   private decalCursor = 0;
   private deathSequence = 0;
@@ -717,11 +784,13 @@ export class EffectPool {
     decalCapacity = 96,
     casingCapacity = 48,
     smokeCapacity = 36,
+    shotTrailCapacity = 16,
   ) {
     this.root.name = 'pooled-effects';
     scene.add(this.root);
     this.burstTexture = makeBurstTexture();
     this.muzzleTexture = makeMuzzleTexture();
+    this.shotTrailTexture = INK_STYLE ? makeShotTrailTexture() : this.burstTexture;
     for (let index = 0; index < spriteCapacity; index += 1) {
       const material = new THREE.SpriteMaterial({ map: this.burstTexture, color: COLORS.blue, transparent: true, opacity: 0, depthWrite: false });
       const sprite = new THREE.Sprite(material);
@@ -793,6 +862,44 @@ export class EffectPool {
       });
     }
 
+    for (let index = 0; index < (INK_STYLE ? shotTrailCapacity : 0); index += 1) {
+      const positions = new Float32Array(18);
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('uv', new THREE.Float32BufferAttribute([
+        0, 0, 1, 0, 1, 1,
+        0, 0, 1, 1, 0, 1,
+      ], 2));
+      const material = new THREE.MeshBasicMaterial({
+        map: this.shotTrailTexture,
+        color: COLORS.blue,
+        transparent: true,
+        opacity: 0,
+        alphaTest: 0.025,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        toneMapped: false,
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.name = `player-ink-shot-trail-${index}`;
+      mesh.visible = false;
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 8;
+      this.root.add(mesh);
+      this.shotTrailSlots.push({
+        mesh,
+        geometry,
+        material,
+        positions,
+        life: 0,
+        maxLife: 1,
+        baseOpacity: 0,
+        direction: new THREE.Vector3(),
+        speed: 0,
+        travelRemaining: 0,
+      });
+    }
+
     for (let index = 0; index < goreCapacity; index += 1) {
       const mesh = new THREE.Mesh(this.goreGeometries.drop, new THREE.MeshBasicMaterial({ color: INK_STYLE ? DEATH_INK_COLORS.dark : COLORS.red }));
       const face = createFragmentFace();
@@ -859,6 +966,71 @@ export class EffectPool {
     slot.material.color.setHex(muzzleBurst ? 0xffffff : COLORS[color]);
     slot.material.opacity = 0.95;
     slot.sprite.visible = true;
+  }
+
+  /** A short-lived dry-brush ribbon that visualizes a hitscan without changing its rules. */
+  spawnPlayerInkTrail(
+    start: THREE.Vector3,
+    end: THREE.Vector3,
+    viewOrigin: THREE.Vector3,
+    up: THREE.Vector3,
+    weaponId: FirearmEffectWeapon,
+    shotId: number,
+  ): void {
+    if (!INK_STYLE || this.shotTrailSlots.length === 0) return;
+    const delta = end.clone().sub(start);
+    const distance = delta.length();
+    if (distance < 0.2) return;
+
+    const profile = playerInkTrailProfile(weaponId);
+    const forward = delta.multiplyScalar(1 / distance);
+    const startOffset = Math.min(0.12, distance * 0.08);
+    const length = Math.min(
+      profile.strokeLength * (0.88 + deterministic(shotId, 1123) * 0.24),
+      distance - startOffset,
+    );
+    if (length < 0.08) return;
+
+    const centerStart = start.clone().addScaledVector(forward, startOffset);
+    const centerEnd = centerStart.clone().addScaledVector(forward, length);
+    const viewDirection = centerStart.clone().lerp(centerEnd, 0.5).sub(viewOrigin);
+    const side = new THREE.Vector3().crossVectors(forward, viewDirection);
+    if (side.lengthSq() < 0.0001) {
+      side.copy(up).addScaledVector(forward, -up.dot(forward));
+    }
+    if (side.lengthSq() < 0.0001) side.set(1, 0, 0);
+    side.normalize();
+
+    const lateralStart = (deterministic(shotId, 1129) - 0.5) * profile.width * 0.28;
+    const lateralEnd = (deterministic(shotId, 1151) - 0.5) * profile.width * 0.72;
+    centerStart.addScaledVector(side, lateralStart);
+    centerEnd.addScaledVector(side, lateralEnd);
+    const halfStart = profile.width * (0.46 + deterministic(shotId, 1153) * 0.12);
+    const halfEnd = profile.width * (0.12 + deterministic(shotId, 1163) * 0.09);
+    const a = centerStart.clone().addScaledVector(side, -halfStart);
+    const b = centerEnd.clone().addScaledVector(side, -halfEnd);
+    const c = centerEnd.clone().addScaledVector(side, halfEnd);
+    const d = centerStart.clone().addScaledVector(side, halfStart);
+
+    const slot = this.shotTrailSlots[this.shotTrailCursor];
+    this.shotTrailCursor = (this.shotTrailCursor + 1) % this.shotTrailSlots.length;
+    const write = (offset: number, point: THREE.Vector3): void => {
+      slot.positions[offset] = point.x;
+      slot.positions[offset + 1] = point.y;
+      slot.positions[offset + 2] = point.z;
+    };
+    write(0, a); write(3, b); write(6, c);
+    write(9, a); write(12, c); write(15, d);
+    (slot.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+    slot.life = slot.maxLife = profile.lifetime;
+    slot.baseOpacity = profile.opacity * (0.9 + deterministic(shotId, 1171) * 0.16);
+    slot.material.color.setHex(shotId % 7 === 0 ? DEATH_INK_COLORS.middle : COLORS.blue);
+    slot.material.opacity = slot.baseOpacity;
+    slot.mesh.position.set(0, 0, 0);
+    slot.mesh.visible = true;
+    slot.direction.copy(forward);
+    slot.speed = profile.travelSpeed;
+    slot.travelRemaining = Math.max(0, distance - startOffset - length);
   }
 
   /**
@@ -1464,6 +1636,22 @@ export class EffectPool {
       slot.sprite.scale.set(scale, scale, 1);
       slot.material.opacity = Math.pow(1 - progress, 1.35) * 0.86;
     }
+    for (const slot of this.shotTrailSlots) {
+      if (!slot.mesh.visible) continue;
+      slot.life -= dt;
+      if (slot.life <= 0) {
+        slot.mesh.visible = false;
+        slot.material.opacity = 0;
+        continue;
+      }
+      const travel = Math.min(slot.travelRemaining, slot.speed * dt);
+      if (travel > 0) {
+        slot.mesh.position.addScaledVector(slot.direction, travel);
+        slot.travelRemaining -= travel;
+      }
+      const ratio = slot.life / slot.maxLife;
+      slot.material.opacity = slot.baseOpacity * Math.min(1, ratio * 2.2);
+    }
     for (const slot of this.goreSlots) {
       if (slot.life <= 0) continue;
       if (slot.delay > 0) {
@@ -1512,6 +1700,7 @@ export class EffectPool {
       debris: this.debrisSlots.filter((slot) => slot.mesh.visible).length,
       casings: this.casingSlots.filter((slot) => slot.object.visible).length,
       smoke: this.smokeSlots.filter((slot) => slot.sprite.visible).length,
+      shotTrails: this.shotTrailSlots.filter((slot) => slot.mesh.visible).length,
       gore: this.goreSlots.filter((slot) => slot.life > 0).length,
       decals: this.decalSlots.filter((slot) => slot.mesh.visible).length,
     };
@@ -1528,6 +1717,11 @@ export class EffectPool {
     }
     for (const slot of this.smokeSlots) {
       slot.sprite.visible = false;
+      slot.material.opacity = 0;
+      slot.life = 0;
+    }
+    for (const slot of this.shotTrailSlots) {
+      slot.mesh.visible = false;
       slot.material.opacity = 0;
       slot.life = 0;
     }

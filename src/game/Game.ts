@@ -14,7 +14,7 @@ import {
   type WeaponEffect,
   type WeaponId,
 } from '../combat';
-import { EffectPool } from '../effects/EffectPool';
+import { EffectPool, playerInkTrailProfile } from '../effects/EffectPool';
 import {
   EnemyManager,
   type EnemyDamageType,
@@ -68,6 +68,12 @@ export interface PublicGameSnapshot {
   activeWeapon: WeaponId;
   rendererObjects: number;
   effects: ReturnType<EffectPool['getSnapshot']>;
+}
+
+interface BallisticRayResult {
+  hit: boolean;
+  headshot: boolean;
+  endpoint: THREE.Vector3;
 }
 
 function weaponSound(id: Exclude<WeaponId, 'katana'>): GameSound {
@@ -124,6 +130,7 @@ export class Game {
   private readonly aimUp = new THREE.Vector3();
   private readonly playerCenter = new THREE.Vector3();
   private readonly temporary = new THREE.Vector3();
+  private readonly pendingShotTrails = new Map<number, THREE.Vector3[]>();
   private readonly overlay: HTMLElement;
   private readonly lastHit = new Map<string, { headshot: boolean; time: number; direction?: THREE.Vector3 }>();
   private readonly captureMode: boolean;
@@ -515,6 +522,7 @@ export class Game {
     this.enemies.reset();
     this.waves.reset();
     this.effects.clear();
+    this.pendingShotTrails.clear();
     this.grapple.reset();
     this.supplies.reset();
     this.arena.resetBreakables();
@@ -695,7 +703,7 @@ export class Game {
   }
 
   private handleHitscan(request: HitscanRequest): void {
-    this.resolveBallisticRay(
+    const result = this.resolveBallisticRay(
       request.weaponId,
       request.origin,
       request.direction,
@@ -703,12 +711,19 @@ export class Game {
       request.range,
       request.knockback,
     );
+    if (ACTIVE_VISUAL_STYLE === 'ink') this.pendingShotTrails.set(request.shotId, [result.endpoint]);
   }
 
   private handlePellets(request: PelletsRequest): void {
     let registeredHit = false;
     let headshot = false;
-    for (const ray of request.rays) {
+    const trailEndpoints: THREE.Vector3[] = [];
+    const trailCount = ACTIVE_VISUAL_STYLE === 'ink' ? playerInkTrailProfile('shotgun').trailCount : 0;
+    const trailIndices = new Set(Array.from({ length: trailCount }, (_, index) => (
+      trailCount <= 1 ? 0 : Math.round(index * (request.rays.length - 1) / (trailCount - 1))
+    )));
+    for (let index = 0; index < request.rays.length; index += 1) {
+      const ray = request.rays[index];
       const result = this.resolveBallisticRay(
         'shotgun',
         request.origin,
@@ -720,7 +735,9 @@ export class Game {
       );
       registeredHit ||= result.hit;
       headshot ||= result.headshot;
+      if (trailIndices.has(index)) trailEndpoints.push(result.endpoint);
     }
+    if (trailEndpoints.length > 0) this.pendingShotTrails.set(request.shotId, trailEndpoints);
     if (registeredHit) {
       this.hud.flashHit(headshot);
       this.audio.play(headshot ? 'headshot' : 'hit');
@@ -735,7 +752,7 @@ export class Game {
     range: number,
     knockback: number,
     flashHud = true,
-  ): { hit: boolean; headshot: boolean } {
+  ): BallisticRayResult {
     this.raycaster.set(origin, direction);
     this.raycaster.far = range;
     const worldHit = this.queries.firstWorldHit(this.raycaster, range);
@@ -754,7 +771,7 @@ export class Game {
         this.hud.flashHit(result.headshot);
         this.audio.play(result.headshot ? 'headshot' : 'hit');
       }
-      return { hit: Boolean(result), headshot: result?.headshot ?? false };
+      return { hit: Boolean(result), headshot: result?.headshot ?? false, endpoint: enemyHit.point.clone() };
     }
 
     if (worldHit) {
@@ -768,8 +785,9 @@ export class Game {
         this.effects.spawnBurst(worldHit.point, 'blue', 0.13, 0.34);
       }
       this.audio.play('worldImpact');
+      return { hit: false, headshot: false, endpoint: worldHit.point.clone() };
     }
-    return { hit: false, headshot: false };
+    return { hit: false, headshot: false, endpoint: origin.clone().addScaledVector(direction, range) };
   }
 
   private handleMelee(request: MeleeRequest): void {
@@ -830,6 +848,20 @@ export class Game {
       request.weaponId,
       request.shotId,
     );
+    const endpoints = this.pendingShotTrails.get(request.shotId);
+    if (endpoints) {
+      endpoints.forEach((endpoint, index) => {
+        this.effects.spawnPlayerInkTrail(
+          this.temporary,
+          endpoint,
+          request.origin,
+          this.aimUp,
+          request.weaponId,
+          request.shotId * 5 + index,
+        );
+      });
+      this.pendingShotTrails.delete(request.shotId);
+    }
   }
 
   private handleWeaponEffect(effect: WeaponEffect): void {
