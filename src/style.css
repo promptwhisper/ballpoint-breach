@@ -342,7 +342,8 @@ html[data-style="ink"] .overlay-card button {
 }
 html[data-style="ink"] .overlay-card button:hover:not(:disabled) { background:#713c32;transform:none; }
 html[data-style="ink"] .overlay-card button:focus-visible { outline:2px solid var(--ink);outline-offset:5px; }
-html[data-style="ink"] .overlay-actions{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap}
+html[data-style="ink"] .overlay-actions{display:flex;align-items:center;justify-content:center;flex-wrap:wrap}
+html[data-style="ink"] .overlay-actions>button+button{margin-left:14px}
 html[data-style="ink"] #save-card-button{color:#713c32;background:rgba(239,238,231,.88);border:1px solid #87473b}
 html[data-style="ink"] #save-card-button:hover:not(:disabled){color:#efeee7;background:#713c32}
 html[data-style="ink"] .share-status{margin:13px auto 0!important;max-width:440px!important;font-size:14px!important;line-height:1.5!important;color:#4c514d}

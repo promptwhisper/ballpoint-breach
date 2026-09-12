@@ -24,6 +24,7 @@ export default defineConfig(({ mode }) => {
       alias: {
         './runtime/canvasRecorder': fileURLToPath(new URL('./src/runtime/canvasRecorder.minitool.ts', import.meta.url)),
         '../audio/AudioSystem': fileURLToPath(new URL('./src/audio/AudioSystem.minitool.ts', import.meta.url)),
+        '../social/saveBattleCard': fileURLToPath(new URL('./src/social/saveBattleCard.minitool.ts', import.meta.url)),
       },
     } : undefined,
     build: {
