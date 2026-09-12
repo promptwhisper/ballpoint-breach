@@ -147,6 +147,15 @@ export interface FirearmAftermathProfile {
   readonly smokeLifetime: number;
 }
 
+/** Art-direction contract for the ink build's non-metallic shot aftermath. */
+export const INK_EJECTION_STYLE = Object.freeze({
+  casingForm: 'torn-paper-slip',
+  muzzleFragmentForm: 'dry-brush-fleck',
+  usesRigidCartridge: false,
+  paperLayers: 1,
+  brushLayers: 3,
+});
+
 export interface PlayerInkTrailProfile {
   readonly trailCount: number;
   readonly strokeLength: number;
@@ -205,10 +214,10 @@ function deathDecalColor(kind: SplatTextureKind, opacity: number, cursor: number
 
 const FIREARM_AFTERMATH: Readonly<Record<FirearmEffectWeapon, FirearmAftermathProfile>> = Object.freeze({
   rifle: Object.freeze({
-    muzzleShardCount: 2,
+    muzzleShardCount: 1,
     casingDelay: 0,
     casingCount: 1,
-    casingScale: [0.065, 0.235, 0.055] as const,
+    casingScale: [0.105, 0.38, 0.07] as const,
     casingLifetime: 0.92,
     receiverBackOffset: 1.26,
     ejectionSpeed: 4.6,
@@ -219,10 +228,10 @@ const FIREARM_AFTERMATH: Readonly<Record<FirearmEffectWeapon, FirearmAftermathPr
     smokeLifetime: 0.105,
   }),
   shotgun: Object.freeze({
-    muzzleShardCount: 12,
+    muzzleShardCount: 4,
     casingDelay: 0.27,
     casingCount: 1,
-    casingScale: [0.095, 0.34, 0.085] as const,
+    casingScale: [0.15, 0.54, 0.09] as const,
     casingLifetime: 1.18,
     receiverBackOffset: 1.16,
     ejectionSpeed: 3.75,
@@ -233,10 +242,10 @@ const FIREARM_AFTERMATH: Readonly<Record<FirearmEffectWeapon, FirearmAftermathPr
     smokeLifetime: 0.16,
   }),
   revolver: Object.freeze({
-    muzzleShardCount: 3,
+    muzzleShardCount: 2,
     casingDelay: 0,
     casingCount: 0,
-    casingScale: [0.065, 0.2, 0.055] as const,
+    casingScale: [0.1, 0.34, 0.065] as const,
     casingLifetime: 0,
     receiverBackOffset: 0.62,
     ejectionSpeed: 4.1,
@@ -247,10 +256,10 @@ const FIREARM_AFTERMATH: Readonly<Record<FirearmEffectWeapon, FirearmAftermathPr
     smokeLifetime: 0.12,
   }),
   sniper: Object.freeze({
-    muzzleShardCount: 4,
+    muzzleShardCount: 2,
     casingDelay: 0.31,
     casingCount: 1,
-    casingScale: [0.075, 0.29, 0.065] as const,
+    casingScale: [0.13, 0.48, 0.08] as const,
     casingLifetime: 1.05,
     receiverBackOffset: 1.3,
     ejectionSpeed: 4.15,
@@ -736,6 +745,83 @@ function makeTaperedStrokeGeometry(): THREE.ConeGeometry {
   return geometry;
 }
 
+function makeTornPaperSlipGeometry(seed: number, taper = false): THREE.BufferGeometry {
+  const sections = 6;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (let section = 0; section <= sections; section += 1) {
+    const progress = section / sections;
+    const width = taper ? THREE.MathUtils.lerp(0.24, 0.035, progress) : 0.46 + deterministic(section, seed) * 0.11;
+    const edgeJitter = (deterministic(section, seed + 17) - 0.5) * (taper ? 0.055 : 0.12);
+    const y = progress - 0.5;
+    const curl = Math.sin(progress * Math.PI) * (taper ? 0.025 : 0.075);
+    positions.push(-width + edgeJitter, y, curl, width + edgeJitter * 0.55, y, curl);
+    if (section < sections) {
+      const base = section * 2;
+      indices.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function makeInkPaperSlip(
+  paperGeometry: THREE.BufferGeometry,
+  brushGeometry: THREE.BufferGeometry,
+  sealGeometry: THREE.BufferGeometry,
+  paperMaterial: THREE.Material,
+  brushMaterial: THREE.Material,
+  accentMaterial: THREE.Material,
+): THREE.Group {
+  const slip = new THREE.Group();
+  slip.name = 'spent-ink-paper-slip';
+
+  const paper = new THREE.Mesh(paperGeometry, paperMaterial);
+  paper.name = 'torn-xuan-paper';
+  slip.add(paper);
+
+  const strokes = [
+    { x: -0.15, y: -0.04, z: 0.082, sx: 0.2, sy: 0.8, rotation: -0.11 },
+    { x: 0.12, y: 0.13, z: 0.086, sx: 0.11, sy: 0.46, rotation: 0.18 },
+    { x: 0.02, y: -0.3, z: 0.09, sx: 0.24, sy: 0.12, rotation: Math.PI / 2.4 },
+  ] as const;
+  for (const [index, spec] of strokes.entries()) {
+    const stroke = new THREE.Mesh(brushGeometry, brushMaterial);
+    stroke.name = `paper-slip-brush-${index}`;
+    stroke.position.set(spec.x, spec.y, spec.z);
+    stroke.scale.set(spec.sx, spec.sy, 1);
+    stroke.rotation.z = spec.rotation;
+    slip.add(stroke);
+  }
+
+  const seal = new THREE.Mesh(sealGeometry, accentMaterial);
+  seal.name = 'paper-slip-cinnabar-mark';
+  seal.position.set(0.27, -0.32, 0.095);
+  slip.add(seal);
+  return slip;
+}
+
+function makeDryBrushFleck(
+  geometry: THREE.BufferGeometry,
+  material: THREE.Material,
+  paleMaterial: THREE.Material,
+): THREE.Group {
+  const fleck = new THREE.Group();
+  fleck.name = 'muzzle-dry-brush-fleck';
+  const dark = new THREE.Mesh(geometry, material);
+  dark.name = 'dry-brush-core';
+  const pale = new THREE.Mesh(geometry, paleMaterial);
+  pale.name = 'dry-brush-gap';
+  pale.position.set(0.08, -0.05, 0.03);
+  pale.scale.set(0.22, 0.72, 1);
+  fleck.add(dark, pale);
+  return fleck;
+}
+
 /** Pooled transient effects plus persistent reference-style death-ink decals. */
 export class EffectPool {
   readonly root = new THREE.Group();
@@ -807,87 +893,33 @@ export class EffectPool {
 
     const casingGeometry = new THREE.BoxGeometry(1, 1, 1);
     const casingEdges = new THREE.EdgesGeometry(casingGeometry, 12);
-    const shardGeometry = INK_STYLE ? new THREE.TetrahedronGeometry(0.72, 0) : casingGeometry;
-    const shardEdges = INK_STYLE ? new THREE.EdgesGeometry(shardGeometry, 8) : casingEdges;
-    const casingMaterial = new THREE.MeshBasicMaterial({ color: INK_STYLE ? 0x5e6056 : COLORS.orange });
-    const casingLightMaterial = new THREE.MeshBasicMaterial({ color: INK_STYLE ? 0x91826a : COLORS.orange });
-    const casingDarkMaterial = new THREE.MeshBasicMaterial({ color: INK_STYLE ? 0x11191b : 0x8e6333 });
-    const casingWashMaterial = new THREE.MeshBasicMaterial({
-      color: 0x20292b,
-      transparent: true,
-      opacity: 0.96,
-      depthWrite: true,
-    });
-    const casingOutline = new THREE.LineBasicMaterial({ color: INK_STYLE ? 0x202426 : 0x403372, transparent: true, opacity: 0.92 });
-    const cartridgeParts = (INK_STYLE ? [
-      { name: 'case-body', geometry: new THREE.CylinderGeometry(0.48, 0.53, 0.68, 8), material: casingMaterial, y: -0.08 },
-      { name: 'case-shoulder', geometry: new THREE.CylinderGeometry(0.34, 0.48, 0.18, 8), material: casingLightMaterial, y: 0.35 },
-      { name: 'case-neck', geometry: new THREE.CylinderGeometry(0.33, 0.34, 0.12, 8), material: casingMaterial, y: 0.5 },
-      { name: 'case-base-rim', geometry: new THREE.CylinderGeometry(0.59, 0.59, 0.075, 10), material: casingDarkMaterial, y: -0.46 },
-      { name: 'case-primer', geometry: new THREE.CylinderGeometry(0.18, 0.18, 0.025, 10), material: casingLightMaterial, y: -0.505 },
-    ] : []).map((part) => ({ ...part, edges: new THREE.EdgesGeometry(part.geometry, 14) }));
-    const mouthGeometry = INK_STYLE ? new THREE.TorusGeometry(0.32, 0.045, 4, 10) : null;
-    mouthGeometry?.rotateX(Math.PI / 2);
-    const washArcs = INK_STYLE ? [
-      { y: -0.27, height: 0.24, thetaStart: -0.35, thetaLength: 3.25 },
-      { y: 0.02, height: 0.3, thetaStart: 1.88, thetaLength: 3 },
-      { y: 0.29, height: 0.17, thetaStart: 0.55, thetaLength: 2.4 },
-    ].map((arc) => ({
-      ...arc,
-      geometry: new THREE.CylinderGeometry(0.535, 0.535, arc.height, 9, 1, true, arc.thetaStart, arc.thetaLength),
-    })) : [];
-    const inkDropGeometry = INK_STYLE ? new THREE.SphereGeometry(0.09, 5, 4) : null;
+    const casingMaterial = new THREE.MeshBasicMaterial({ color: COLORS.orange });
+    const casingOutline = new THREE.LineBasicMaterial({ color: 0x403372, transparent: true, opacity: 0.92 });
+    const paperSlipGeometry = makeTornPaperSlipGeometry(733);
+    const brushFleckGeometry = makeTornPaperSlipGeometry(761, true);
+    const paperSealGeometry = new THREE.CircleGeometry(0.075, 7);
+    const paperMaterial = new THREE.MeshBasicMaterial({ color: 0xd8d2bf, side: THREE.DoubleSide });
+    const brushMaterial = new THREE.MeshBasicMaterial({ color: 0x1c2324, side: THREE.DoubleSide });
+    const brushGapMaterial = new THREE.MeshBasicMaterial({ color: 0xd0ccbd, side: THREE.DoubleSide });
+    const sealMaterial = new THREE.MeshBasicMaterial({ color: 0x8d4038, side: THREE.DoubleSide });
     for (let index = 0; index < casingCapacity; index += 1) {
       const object = new THREE.Group();
       object.name = `ejected-casing-${index}`;
       object.visible = false;
       object.frustumCulled = false;
-      const shard = new THREE.Group();
-      shard.name = 'muzzle-paper-shard';
-      const shardBody = new THREE.Mesh(shardGeometry, casingMaterial);
-      const shardOutline = new THREE.LineSegments(shardEdges, casingOutline);
-      shardOutline.scale.setScalar(1.035);
-      shard.add(shardBody, shardOutline);
-
-      const cartridge = new THREE.Group();
-      cartridge.name = 'spent-cartridge';
-      if (INK_STYLE) {
-        for (const part of cartridgeParts) {
-          const body = new THREE.Mesh(part.geometry, part.material);
-          body.name = part.name;
-          body.position.y = part.y;
-          const outline = new THREE.LineSegments(part.edges, casingOutline);
-          outline.position.y = part.y;
-          outline.scale.setScalar(1.018);
-          cartridge.add(body, outline);
-        }
-        if (mouthGeometry) {
-          const mouth = new THREE.Mesh(mouthGeometry, casingDarkMaterial);
-          mouth.name = 'case-mouth-ring';
-          mouth.position.y = 0.57;
-          cartridge.add(mouth);
-        }
-        for (const arc of washArcs) {
-          const band = new THREE.Mesh(arc.geometry, casingWashMaterial);
-          band.name = 'case-ink-wash-band';
-          band.position.y = arc.y;
-          cartridge.add(band);
-        }
-        if (inkDropGeometry) {
-          const inkDrops = [
-            { position: [0.5, -0.39, 0.08], scale: [0.72, 1.75, 0.42] },
-            { position: [-0.22, 0.1, -0.49], scale: [0.5, 1.15, 0.68] },
-            { position: [0.3, 0.35, 0.35], scale: [0.42, 0.9, 0.5] },
-          ] as const;
-          for (const drop of inkDrops) {
-            const splatter = new THREE.Mesh(inkDropGeometry, casingDarkMaterial);
-            splatter.name = 'case-ink-splatter';
-            splatter.position.set(drop.position[0], drop.position[1], drop.position[2]);
-            splatter.scale.set(drop.scale[0], drop.scale[1], drop.scale[2]);
-            cartridge.add(splatter);
-          }
-        }
-      } else {
+      const shard = INK_STYLE
+        ? makeDryBrushFleck(brushFleckGeometry, brushMaterial, brushGapMaterial)
+        : new THREE.Group();
+      const cartridge = INK_STYLE
+        ? makeInkPaperSlip(paperSlipGeometry, brushFleckGeometry, paperSealGeometry, paperMaterial, brushMaterial, sealMaterial)
+        : new THREE.Group();
+      if (!INK_STYLE) {
+        shard.name = 'muzzle-case-shard';
+        const shardBody = new THREE.Mesh(casingGeometry, casingMaterial);
+        const shardOutline = new THREE.LineSegments(casingEdges, casingOutline);
+        shardOutline.scale.setScalar(1.035);
+        shard.add(shardBody, shardOutline);
+        cartridge.name = 'spent-cartridge';
         const body = new THREE.Mesh(casingGeometry, casingMaterial);
         const outline = new THREE.LineSegments(casingEdges, casingOutline);
         outline.scale.setScalar(1.035);
@@ -1126,9 +1158,9 @@ export class EffectPool {
   }
 
   /**
-   * Recreates the reference's near-camera shot aftermath: a paper-white smoke
-   * scribble and exaggerated orange case shards that arc down under gravity.
-   * Rifle shards eject with the shot, while pump/bolt weapons queue one case.
+   * Creates the near-camera shot aftermath: paper-white smoke, brief dry-brush
+   * flecks, and one torn-paper slip that arcs down under gravity. Pump and bolt
+   * weapons queue their larger paper slips at the authored action beat.
    */
   spawnFirearmAftermath(
     position: THREE.Vector3,
@@ -1214,7 +1246,7 @@ export class EffectPool {
     if (radialDirection.lengthSq() < 0.001) radialDirection.copy(right);
     radialDirection.normalize();
     const shardScale = isMuzzleShard
-      ? (pending.weaponId === 'shotgun' ? 1.8 : pending.weaponId === 'sniper' ? 1.5 : pending.weaponId === 'revolver' ? 1.4 : 1.72)
+      ? (pending.weaponId === 'shotgun' ? 1.35 : pending.weaponId === 'sniper' ? 1.2 : pending.weaponId === 'revolver' ? 1.15 : 1.25)
       : 1;
 
     slot.life = slot.maxLife = isMuzzleShard

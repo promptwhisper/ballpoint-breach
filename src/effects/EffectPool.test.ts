@@ -1,11 +1,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DEATH_INK_STYLE, firearmAftermathProfile, playerInkTrailProfile } from './EffectPool';
+import { DEATH_INK_STYLE, firearmAftermathProfile, INK_EJECTION_STYLE, playerInkTrailProfile } from './EffectPool';
 
-test('rifle ejects the reference three-shard case burst immediately with a two-puff muzzle cloud', () => {
+test('ink ejection replaces rigid cartridge chunks with paper and dry-brush forms', () => {
+  assert.equal(INK_EJECTION_STYLE.casingForm, 'torn-paper-slip');
+  assert.equal(INK_EJECTION_STYLE.muzzleFragmentForm, 'dry-brush-fleck');
+  assert.equal(INK_EJECTION_STYLE.usesRigidCartridge, false);
+  assert.equal(INK_EJECTION_STYLE.paperLayers, 1);
+  assert.ok(INK_EJECTION_STYLE.brushLayers >= 3);
+});
+
+test('rifle ejects one restrained brush fleck and one paper slip with a two-puff muzzle cloud', () => {
   const profile = firearmAftermathProfile('rifle');
   assert.equal(profile.casingDelay, 0);
-  assert.equal(profile.muzzleShardCount + profile.casingCount, 3);
+  assert.equal(profile.muzzleShardCount, 1);
   assert.equal(profile.casingCount, 1);
   assert.equal(profile.smokeCount, 2);
   assert.ok(profile.ejectionSpeed > profile.liftSpeed);
@@ -22,7 +30,7 @@ test('pump and bolt weapons defer their larger cases to the authored action', ()
   assert.ok(shotgun.casingScale[1] > sniper.casingScale[1]);
   assert.ok(sniper.casingScale[1] > rifle.casingScale[1]);
   assert.ok(shotgun.smokeScale > rifle.smokeScale);
-  assert.equal(shotgun.muzzleShardCount, 12);
+  assert.equal(shotgun.muzzleShardCount, 4);
 });
 
 test('revolver retains cases in its cylinder during firing', () => {
