@@ -40,6 +40,9 @@ interface ShotTrailSlot {
   mesh: THREE.Mesh;
   geometry: THREE.BufferGeometry;
   material: THREE.MeshBasicMaterial;
+  tip: THREE.Sprite;
+  tipMaterial: THREE.SpriteMaterial;
+  tipBaseScale: number;
   positions: Float32Array;
   life: number;
   maxLife: number;
@@ -271,10 +274,10 @@ export function firearmAftermathProfile(weaponId: FirearmEffectWeapon): FirearmA
 }
 
 const PLAYER_INK_TRAILS: Readonly<Record<FirearmEffectWeapon, PlayerInkTrailProfile>> = Object.freeze({
-  rifle: Object.freeze({ trailCount: 1, strokeLength: 1.25, travelSpeed: 92, width: 0.095, lifetime: 0.09, opacity: 0.76 }),
-  shotgun: Object.freeze({ trailCount: 3, strokeLength: 0.78, travelSpeed: 66, width: 0.1, lifetime: 0.1, opacity: 0.62 }),
-  revolver: Object.freeze({ trailCount: 1, strokeLength: 1.55, travelSpeed: 78, width: 0.115, lifetime: 0.105, opacity: 0.82 }),
-  sniper: Object.freeze({ trailCount: 1, strokeLength: 2.5, travelSpeed: 124, width: 0.145, lifetime: 0.13, opacity: 0.86 }),
+  rifle: Object.freeze({ trailCount: 1, strokeLength: 1.25, travelSpeed: 92, width: 0.095, lifetime: 0.14, opacity: 0.76 }),
+  shotgun: Object.freeze({ trailCount: 3, strokeLength: 0.78, travelSpeed: 66, width: 0.1, lifetime: 0.13, opacity: 0.62 }),
+  revolver: Object.freeze({ trailCount: 1, strokeLength: 1.55, travelSpeed: 78, width: 0.115, lifetime: 0.16, opacity: 0.82 }),
+  sniper: Object.freeze({ trailCount: 1, strokeLength: 2.5, travelSpeed: 124, width: 0.145, lifetime: 0.18, opacity: 0.86 }),
 });
 
 export function playerInkTrailProfile(weaponId: FirearmEffectWeapon): PlayerInkTrailProfile {
@@ -885,6 +888,21 @@ export class EffectPool {
         toneMapped: false,
       });
       const mesh = new THREE.Mesh(geometry, material);
+      const tipMaterial = new THREE.SpriteMaterial({
+        map: this.burstTexture,
+        color: COLORS.blue,
+        transparent: true,
+        opacity: 0,
+        alphaTest: 0.035,
+        depthWrite: false,
+        toneMapped: false,
+      });
+      const tip = new THREE.Sprite(tipMaterial);
+      tip.name = `player-ink-shot-tip-${index}`;
+      tip.visible = false;
+      tip.frustumCulled = false;
+      tip.renderOrder = 9;
+      mesh.add(tip);
       mesh.name = `player-ink-shot-trail-${index}`;
       mesh.visible = false;
       mesh.frustumCulled = false;
@@ -894,6 +912,9 @@ export class EffectPool {
         mesh,
         geometry,
         material,
+        tip,
+        tipMaterial,
+        tipBaseScale: 0,
         positions,
         life: 0,
         maxLife: 1,
@@ -1028,8 +1049,15 @@ export class EffectPool {
     (slot.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
     slot.life = slot.maxLife = profile.lifetime;
     slot.baseOpacity = profile.opacity * (0.9 + deterministic(shotId, 1171) * 0.16);
-    slot.material.color.setHex(shotId % 7 === 0 ? DEATH_INK_COLORS.middle : COLORS.blue);
+    const inkColor = shotId % 7 === 0 ? DEATH_INK_COLORS.middle : COLORS.blue;
+    slot.material.color.setHex(inkColor);
     slot.material.opacity = slot.baseOpacity;
+    slot.tipMaterial.color.setHex(inkColor);
+    slot.tipMaterial.opacity = Math.min(0.96, slot.baseOpacity * 1.12);
+    slot.tipBaseScale = profile.width * (1.8 + deterministic(shotId, 1181) * 0.55);
+    slot.tip.position.copy(centerEnd);
+    slot.tip.scale.setScalar(slot.tipBaseScale);
+    slot.tip.visible = true;
     slot.mesh.position.set(0, 0, 0);
     slot.mesh.visible = true;
     slot.direction.copy(forward);
@@ -1646,6 +1674,8 @@ export class EffectPool {
       if (slot.life <= 0) {
         slot.mesh.visible = false;
         slot.material.opacity = 0;
+        slot.tip.visible = false;
+        slot.tipMaterial.opacity = 0;
         continue;
       }
       const travel = Math.min(slot.travelRemaining, slot.speed * dt);
@@ -1655,6 +1685,8 @@ export class EffectPool {
       }
       const ratio = slot.life / slot.maxLife;
       slot.material.opacity = slot.baseOpacity * Math.min(1, ratio * 2.2);
+      slot.tipMaterial.opacity = Math.min(0.96, slot.material.opacity * 1.12);
+      slot.tip.scale.setScalar(slot.tipBaseScale * (0.86 + ratio * 0.14));
     }
     for (const slot of this.goreSlots) {
       if (slot.life <= 0) continue;
@@ -1727,6 +1759,8 @@ export class EffectPool {
     for (const slot of this.shotTrailSlots) {
       slot.mesh.visible = false;
       slot.material.opacity = 0;
+      slot.tip.visible = false;
+      slot.tipMaterial.opacity = 0;
       slot.life = 0;
     }
     for (const slot of this.goreSlots) {

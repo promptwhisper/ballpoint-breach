@@ -43,8 +43,8 @@ test('player ink trails stay brief and sparse while preserving weapon character'
   assert.equal(shotgun.trailCount, 3);
   assert.equal(revolver.trailCount, 1);
   assert.equal(sniper.trailCount, 1);
-  assert.ok(rifle.lifetime < 0.1);
-  assert.ok(sniper.lifetime <= 0.14);
+  assert.ok(rifle.lifetime <= 0.15);
+  assert.ok(sniper.lifetime <= 0.2);
   assert.ok(sniper.strokeLength > revolver.strokeLength);
   assert.ok(revolver.strokeLength > rifle.strokeLength);
   assert.ok(shotgun.strokeLength < rifle.strokeLength);
