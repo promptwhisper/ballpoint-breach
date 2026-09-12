@@ -2,15 +2,16 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DEATH_INK_STYLE, firearmAftermathProfile, INK_EJECTION_STYLE, playerInkTrailProfile } from './EffectPool';
 
-test('ink ejection replaces rigid cartridge chunks with paper and dry-brush forms', () => {
-  assert.equal(INK_EJECTION_STYLE.casingForm, 'torn-paper-slip');
-  assert.equal(INK_EJECTION_STYLE.muzzleFragmentForm, 'dry-brush-fleck');
+test('ink ejection replaces rigid cartridge chunks with layered dispersing ink', () => {
+  assert.equal(INK_EJECTION_STYLE.casingForm, 'wet-ink-bloom');
+  assert.equal(INK_EJECTION_STYLE.muzzleFragmentForm, 'flying-white-brush');
   assert.equal(INK_EJECTION_STYLE.usesRigidCartridge, false);
-  assert.equal(INK_EJECTION_STYLE.paperLayers, 1);
-  assert.ok(INK_EJECTION_STYLE.brushLayers >= 3);
+  assert.equal(INK_EJECTION_STYLE.paperLayers, 0);
+  assert.ok(INK_EJECTION_STYLE.brushLayers >= 4);
+  assert.equal(INK_EJECTION_STYLE.dissolvesInFlight, true);
 });
 
-test('rifle ejects one restrained brush fleck and one paper slip with a two-puff muzzle cloud', () => {
+test('rifle ejects one restrained flying-white stroke and one wet-ink bloom', () => {
   const profile = firearmAftermathProfile('rifle');
   assert.equal(profile.casingDelay, 0);
   assert.equal(profile.muzzleShardCount, 1);

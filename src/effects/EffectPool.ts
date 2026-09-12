@@ -22,6 +22,8 @@ interface CasingSlot {
   object: THREE.Group;
   cartridge: THREE.Group;
   shard: THREE.Group;
+  inkLayers: Array<{ material: THREE.SpriteMaterial; opacity: number }>;
+  baseScale: THREE.Vector3;
   velocity: THREE.Vector3;
   spin: THREE.Vector3;
   life: number;
@@ -149,11 +151,12 @@ export interface FirearmAftermathProfile {
 
 /** Art-direction contract for the ink build's non-metallic shot aftermath. */
 export const INK_EJECTION_STYLE = Object.freeze({
-  casingForm: 'torn-paper-slip',
-  muzzleFragmentForm: 'dry-brush-fleck',
+  casingForm: 'wet-ink-bloom',
+  muzzleFragmentForm: 'flying-white-brush',
   usesRigidCartridge: false,
-  paperLayers: 1,
-  brushLayers: 3,
+  paperLayers: 0,
+  brushLayers: 4,
+  dissolvesInFlight: true,
 });
 
 export interface PlayerInkTrailProfile {
@@ -217,7 +220,7 @@ const FIREARM_AFTERMATH: Readonly<Record<FirearmEffectWeapon, FirearmAftermathPr
     muzzleShardCount: 1,
     casingDelay: 0,
     casingCount: 1,
-    casingScale: [0.105, 0.38, 0.07] as const,
+    casingScale: [0.16, 0.26, 0.07] as const,
     casingLifetime: 0.92,
     receiverBackOffset: 1.26,
     ejectionSpeed: 4.6,
@@ -231,7 +234,7 @@ const FIREARM_AFTERMATH: Readonly<Record<FirearmEffectWeapon, FirearmAftermathPr
     muzzleShardCount: 4,
     casingDelay: 0.27,
     casingCount: 1,
-    casingScale: [0.15, 0.54, 0.09] as const,
+    casingScale: [0.23, 0.34, 0.09] as const,
     casingLifetime: 1.18,
     receiverBackOffset: 1.16,
     ejectionSpeed: 3.75,
@@ -245,7 +248,7 @@ const FIREARM_AFTERMATH: Readonly<Record<FirearmEffectWeapon, FirearmAftermathPr
     muzzleShardCount: 2,
     casingDelay: 0,
     casingCount: 0,
-    casingScale: [0.1, 0.34, 0.065] as const,
+    casingScale: [0.15, 0.24, 0.065] as const,
     casingLifetime: 0,
     receiverBackOffset: 0.62,
     ejectionSpeed: 4.1,
@@ -259,7 +262,7 @@ const FIREARM_AFTERMATH: Readonly<Record<FirearmEffectWeapon, FirearmAftermathPr
     muzzleShardCount: 2,
     casingDelay: 0.31,
     casingCount: 1,
-    casingScale: [0.13, 0.48, 0.08] as const,
+    casingScale: [0.2, 0.31, 0.08] as const,
     casingLifetime: 1.05,
     receiverBackOffset: 1.3,
     ejectionSpeed: 4.15,
@@ -745,81 +748,84 @@ function makeTaperedStrokeGeometry(): THREE.ConeGeometry {
   return geometry;
 }
 
-function makeTornPaperSlipGeometry(seed: number, taper = false): THREE.BufferGeometry {
-  const sections = 6;
-  const positions: number[] = [];
-  const indices: number[] = [];
-  for (let section = 0; section <= sections; section += 1) {
-    const progress = section / sections;
-    const width = taper ? THREE.MathUtils.lerp(0.24, 0.035, progress) : 0.46 + deterministic(section, seed) * 0.11;
-    const edgeJitter = (deterministic(section, seed + 17) - 0.5) * (taper ? 0.055 : 0.12);
-    const y = progress - 0.5;
-    const curl = Math.sin(progress * Math.PI) * (taper ? 0.025 : 0.075);
-    positions.push(-width + edgeJitter, y, curl, width + edgeJitter * 0.55, y, curl);
-    if (section < sections) {
-      const base = section * 2;
-      indices.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
+function makeEjectedInkTexture(seed: number, fleck: boolean): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 192;
+  canvas.height = 96;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('2D canvas is unavailable');
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = '#ffffff';
+  if (fleck) {
+    drawTaperedStroke(context, 12, 51, 183, 43, 17, 1.4, -7, 0.94);
+    drawTaperedStroke(context, 18, 59, 159, 61, 5.5, 0.4, 3, 0.42);
+    for (let index = 0; index < 4; index += 1) {
+      drawDroplet(context, 116 + index * 17, 29 + deterministic(index, seed) * 35, 1.4 + index * 0.45, 1.7, -0.3, 0.55);
     }
+    cutDryBrushGaps(context, seed + 23, 98, 48, 162, 39, 31);
+  } else {
+    drawRaggedIsland(context, seed, 91, 48, 63, 27, 0.92);
+    drawTaperedStroke(context, 17, 51, 176, 42, 12, 1.2, -5, 0.8);
+    drawTaperedStroke(context, 35, 66, 154, 68, 4.8, 0.35, 3, 0.46);
+    for (let index = 0; index < 7; index += 1) {
+      const angle = -0.9 + index * 0.31;
+      drawDroplet(
+        context,
+        130 + Math.cos(angle) * (34 + index * 3),
+        50 + Math.sin(angle) * (23 + index * 2),
+        1.3 + deterministic(index, seed + 11) * 3,
+        1.2 + deterministic(index, seed + 13),
+        angle,
+        0.5 + deterministic(index, seed + 17) * 0.4,
+      );
+    }
+    cutDryBrushGaps(context, seed + 31, 92, 48, 142, 50, 22);
   }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
-  return geometry;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  return texture;
 }
 
-function makeInkPaperSlip(
-  paperGeometry: THREE.BufferGeometry,
-  brushGeometry: THREE.BufferGeometry,
-  sealGeometry: THREE.BufferGeometry,
-  paperMaterial: THREE.Material,
-  brushMaterial: THREE.Material,
-  accentMaterial: THREE.Material,
-): THREE.Group {
-  const slip = new THREE.Group();
-  slip.name = 'spent-ink-paper-slip';
+function makeInkEjectionMark(
+  texture: THREE.Texture,
+  fleck: boolean,
+): { group: THREE.Group; layers: Array<{ material: THREE.SpriteMaterial; opacity: number }> } {
+  const group = new THREE.Group();
+  group.name = fleck ? 'muzzle-flying-white-brush' : 'spent-wet-ink-bloom';
+  const layers: Array<{ material: THREE.SpriteMaterial; opacity: number }> = [];
+  const addLayer = (
+    name: string,
+    color: number,
+    opacity: number,
+    scale: readonly [number, number],
+    position: readonly [number, number, number],
+  ): void => {
+    const material = new THREE.SpriteMaterial({
+      map: texture,
+      color,
+      transparent: true,
+      opacity,
+      alphaTest: 0.025,
+      depthWrite: false,
+    });
+    const mesh = new THREE.Sprite(material);
+    mesh.name = name;
+    mesh.position.set(position[0], position[1], position[2]);
+    mesh.scale.set(scale[0], scale[1], 1);
+    group.add(mesh);
+    layers.push({ material, opacity });
+  };
 
-  const paper = new THREE.Mesh(paperGeometry, paperMaterial);
-  paper.name = 'torn-xuan-paper';
-  slip.add(paper);
-
-  const strokes = [
-    { x: -0.15, y: -0.04, z: 0.082, sx: 0.2, sy: 0.8, rotation: -0.11 },
-    { x: 0.12, y: 0.13, z: 0.086, sx: 0.11, sy: 0.46, rotation: 0.18 },
-    { x: 0.02, y: -0.3, z: 0.09, sx: 0.24, sy: 0.12, rotation: Math.PI / 2.4 },
-  ] as const;
-  for (const [index, spec] of strokes.entries()) {
-    const stroke = new THREE.Mesh(brushGeometry, brushMaterial);
-    stroke.name = `paper-slip-brush-${index}`;
-    stroke.position.set(spec.x, spec.y, spec.z);
-    stroke.scale.set(spec.sx, spec.sy, 1);
-    stroke.rotation.z = spec.rotation;
-    slip.add(stroke);
+  addLayer('ink-wash-halo', 0x777b75, fleck ? 0.2 : 0.34, fleck ? [3.5, 0.55] : [2.35, 1.38], [0, 0, -0.025]);
+  addLayer('wet-ink-core', 0x111718, fleck ? 0.82 : 0.92, fleck ? [3.2, 0.42] : [2, 1], [0, 0, 0]);
+  addLayer('broken-dry-edge', 0x464b48, fleck ? 0.4 : 0.56, fleck ? [2.15, 0.24] : [1.35, 0.58], [-0.09, 0.16, 0.022]);
+  if (!fleck) {
+    addLayer('detached-ink-drop-a', 0x1b2223, 0.78, [0.17, 0.19], [0.64, 0.25, 0.035]);
+    addLayer('detached-ink-drop-b', 0x4f5450, 0.56, [0.1, 0.13], [0.82, -0.2, 0.04]);
   }
-
-  const seal = new THREE.Mesh(sealGeometry, accentMaterial);
-  seal.name = 'paper-slip-cinnabar-mark';
-  seal.position.set(0.27, -0.32, 0.095);
-  slip.add(seal);
-  return slip;
-}
-
-function makeDryBrushFleck(
-  geometry: THREE.BufferGeometry,
-  material: THREE.Material,
-  paleMaterial: THREE.Material,
-): THREE.Group {
-  const fleck = new THREE.Group();
-  fleck.name = 'muzzle-dry-brush-fleck';
-  const dark = new THREE.Mesh(geometry, material);
-  dark.name = 'dry-brush-core';
-  const pale = new THREE.Mesh(geometry, paleMaterial);
-  pale.name = 'dry-brush-gap';
-  pale.position.set(0.08, -0.05, 0.03);
-  pale.scale.set(0.22, 0.72, 1);
-  fleck.add(dark, pale);
-  return fleck;
+  return { group, layers };
 }
 
 /** Pooled transient effects plus persistent reference-style death-ink decals. */
@@ -895,24 +901,24 @@ export class EffectPool {
     const casingEdges = new THREE.EdgesGeometry(casingGeometry, 12);
     const casingMaterial = new THREE.MeshBasicMaterial({ color: COLORS.orange });
     const casingOutline = new THREE.LineBasicMaterial({ color: 0x403372, transparent: true, opacity: 0.92 });
-    const paperSlipGeometry = makeTornPaperSlipGeometry(733);
-    const brushFleckGeometry = makeTornPaperSlipGeometry(761, true);
-    const paperSealGeometry = new THREE.CircleGeometry(0.075, 7);
-    const paperMaterial = new THREE.MeshBasicMaterial({ color: 0xd8d2bf, side: THREE.DoubleSide });
-    const brushMaterial = new THREE.MeshBasicMaterial({ color: 0x1c2324, side: THREE.DoubleSide });
-    const brushGapMaterial = new THREE.MeshBasicMaterial({ color: 0xd0ccbd, side: THREE.DoubleSide });
-    const sealMaterial = new THREE.MeshBasicMaterial({ color: 0x8d4038, side: THREE.DoubleSide });
+    const wetInkTexture = INK_STYLE ? makeEjectedInkTexture(733, false) : null;
+    const flyingWhiteTexture = INK_STYLE ? makeEjectedInkTexture(761, true) : null;
     for (let index = 0; index < casingCapacity; index += 1) {
       const object = new THREE.Group();
       object.name = `ejected-casing-${index}`;
       object.visible = false;
       object.frustumCulled = false;
-      const shard = INK_STYLE
-        ? makeDryBrushFleck(brushFleckGeometry, brushMaterial, brushGapMaterial)
-        : new THREE.Group();
-      const cartridge = INK_STYLE
-        ? makeInkPaperSlip(paperSlipGeometry, brushFleckGeometry, paperSealGeometry, paperMaterial, brushMaterial, sealMaterial)
-        : new THREE.Group();
+      const inkLayers: Array<{ material: THREE.SpriteMaterial; opacity: number }> = [];
+      const shardMark = INK_STYLE && flyingWhiteTexture
+        ? makeInkEjectionMark(flyingWhiteTexture, true)
+        : null;
+      const cartridgeMark = INK_STYLE && wetInkTexture
+        ? makeInkEjectionMark(wetInkTexture, false)
+        : null;
+      const shard = shardMark?.group ?? new THREE.Group();
+      const cartridge = cartridgeMark?.group ?? new THREE.Group();
+      if (shardMark) inkLayers.push(...shardMark.layers);
+      if (cartridgeMark) inkLayers.push(...cartridgeMark.layers);
       if (!INK_STYLE) {
         shard.name = 'muzzle-case-shard';
         const shardBody = new THREE.Mesh(casingGeometry, casingMaterial);
@@ -937,6 +943,8 @@ export class EffectPool {
         object,
         cartridge,
         shard,
+        inkLayers,
+        baseScale: new THREE.Vector3(1, 1, 1),
         velocity: new THREE.Vector3(),
         spin: new THREE.Vector3(),
         life: 0,
@@ -1158,9 +1166,9 @@ export class EffectPool {
   }
 
   /**
-   * Creates the near-camera shot aftermath: paper-white smoke, brief dry-brush
-   * flecks, and one torn-paper slip that arcs down under gravity. Pump and bolt
-   * weapons queue their larger paper slips at the authored action beat.
+   * Creates the near-camera shot aftermath: paper-white smoke, brief flying-white
+   * strokes, and one wet-ink bloom that arcs and disperses under gravity. Pump
+   * and bolt weapons queue their larger blooms at the authored action beat.
    */
   spawnFirearmAftermath(
     position: THREE.Vector3,
@@ -1267,6 +1275,11 @@ export class EffectPool {
       profile.casingScale[1] * (0.9 + variation * 0.2) * shardScale,
       profile.casingScale[2] * (0.9 + variation * 0.2) * shardScale,
     );
+    slot.baseScale.copy(slot.object.scale);
+    for (const [layerIndex, layer] of slot.inkLayers.entries()) {
+      layer.material.opacity = layer.opacity;
+      layer.material.rotation = sideVariation * 0.7 + layerIndex * 0.045;
+    }
     if (isMuzzleShard) {
       slot.object.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), radialDirection);
       slot.object.rotateY(sideVariation * 0.28);
@@ -1705,6 +1718,20 @@ export class EffectPool {
       if (slot.life <= 0) {
         slot.object.visible = false;
         continue;
+      }
+      if (slot.inkLayers.length > 0) {
+        const lifeRatio = THREE.MathUtils.clamp(slot.life / slot.maxLife, 0, 1);
+        const spread = 1 - lifeRatio;
+        const fade = Math.pow(Math.min(1, lifeRatio * 3.2), 0.72);
+        slot.object.scale.set(
+          slot.baseScale.x * (1 + spread * (slot.muzzleShard ? 0.24 : 0.58)),
+          slot.baseScale.y * (1 + spread * (slot.muzzleShard ? 0.12 : 0.26)),
+          slot.baseScale.z,
+        );
+        for (const [layerIndex, layer] of slot.inkLayers.entries()) {
+          layer.material.opacity = layer.opacity * fade;
+          layer.material.rotation += dt * (slot.muzzleShard ? 5.5 : 2.2) * (layerIndex % 2 === 0 ? 1 : -0.72);
+        }
       }
       slot.velocity.y -= 13.2 * dt;
       slot.object.position.addScaledVector(slot.velocity, dt);
