@@ -45,10 +45,12 @@ export class Hud {
   }
   readonly startButton: HTMLButtonElement;
   readonly restartButton: HTMLButtonElement;
+  readonly saveCardButton: HTMLButtonElement;
   private readonly overlay: HTMLElement;
   private readonly overlayInkTitle: HTMLElement;
   private readonly overlayTitle: HTMLElement;
   private readonly overlayCopy: HTMLElement;
+  private readonly shareStatus: HTMLElement;
   private readonly score: HTMLElement;
   private readonly wave: HTMLElement;
   private readonly enemies: HTMLElement;
@@ -92,6 +94,8 @@ export class Hud {
     this.overlayCopy = required('#overlay-copy');
     this.startButton = required<HTMLButtonElement>('#start-button');
     this.restartButton = required<HTMLButtonElement>('#restart-button');
+    this.saveCardButton = required<HTMLButtonElement>('#save-card-button');
+    this.shareStatus = required('#share-status');
     this.score = required('[data-hud="score"]');
     this.wave = required('[data-hud="wave"]');
     this.enemies = required('[data-hud="enemies"]');
@@ -126,6 +130,7 @@ export class Hud {
     this.overlay.classList.toggle('visible', visible);
     this.startButton.hidden = mode !== 'start' && mode !== 'loading';
     this.restartButton.hidden = mode !== 'defeat' && mode !== 'victory';
+    this.saveCardButton.hidden = !this.inkStyle || (mode !== 'defeat' && mode !== 'victory');
     this.root.body.dataset.gameMode = mode;
     if (mode !== 'playing') this.inkDamage?.clear();
     if (this.inkStyle) {
@@ -171,6 +176,22 @@ export class Hud {
       this.overlayCopy.textContent = 'all ten waves cleared · THE DOODLER has been erased';
       this.restartButton.textContent = 'PLAY AGAIN';
     }
+  }
+
+  resetShareStatus(): void {
+    this.saveCardButton.disabled = false;
+    this.saveCardButton.textContent = '保存战帖';
+    this.shareStatus.hidden = true;
+    this.shareStatus.textContent = '';
+    delete this.shareStatus.dataset.state;
+  }
+
+  setShareStatus(state: 'saving' | 'saved' | 'error', message: string): void {
+    this.saveCardButton.disabled = state === 'saving';
+    this.saveCardButton.textContent = state === 'saving' ? '正在落印…' : state === 'saved' ? '再存一张' : '重新保存';
+    this.shareStatus.hidden = false;
+    this.shareStatus.dataset.state = state;
+    this.shareStatus.textContent = message;
   }
 
   render(snapshot: HudSnapshot): void {

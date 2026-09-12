@@ -35,6 +35,8 @@ import { createGameScene } from './createGameScene';
 import { InkOutline } from '../render/InkOutline';
 import { ACTIVE_INK_VERSION } from '../render/inkSettings';
 import { ACTIVE_VISUAL_STYLE } from '../render/visualStyle';
+import { composeBattleCard, type BattleCardStats } from '../social/BattleCard';
+import { saveBattleCard, saveBattleCardError } from '../social/saveBattleCard';
 
 const BASE_FOV = 68;
 const PLAYER_CENTER_HEIGHT = 0.95;
@@ -178,6 +180,8 @@ export class Game {
   private footstepIndex = -1;
   private audioWasGrounded = false;
   private movementAudioPrimed = false;
+  private roundStats: BattleCardStats = this.createRoundStats();
+  private savingBattleCard = false;
 
   constructor(readonly canvas: HTMLCanvasElement, options: GameOptions = {}) {
     this.captureMode = options.capture ?? false;
@@ -345,6 +349,7 @@ export class Game {
     this.canvas.removeEventListener('webglcontextrestored', this.handleContextRestored);
     this.hud.startButton.removeEventListener('click', this.handleStartClick);
     this.hud.restartButton.removeEventListener('click', this.handleRestartClick);
+    this.hud.saveCardButton.removeEventListener('click', this.handleSaveCardClick);
     this.overlay.removeEventListener('click', this.handleOverlayClick);
     for (const event of ['mousedown', 'touchstart', 'touchend', 'keydown']) {
       document.removeEventListener(event, this.handleAudioGesture, true);
@@ -381,6 +386,7 @@ export class Game {
     this.canvas.addEventListener('webglcontextrestored', this.handleContextRestored);
     this.hud.startButton.addEventListener('click', this.handleStartClick);
     this.hud.restartButton.addEventListener('click', this.handleRestartClick);
+    this.hud.saveCardButton.addEventListener('click', this.handleSaveCardClick);
     this.overlay.addEventListener('click', this.handleOverlayClick);
     for (const event of ['mousedown', 'touchstart', 'touchend', 'keydown']) {
       document.addEventListener(event, this.handleAudioGesture, { capture: true, passive: true });
@@ -451,6 +457,43 @@ export class Game {
     this.requestGameplayControl();
   };
 
+  private readonly handleSaveCardClick = (event: MouseEvent): void => {
+    event.stopPropagation();
+    if (this.savingBattleCard || (this.state.mode !== 'defeat' && this.state.mode !== 'victory')) return;
+    this.savingBattleCard = true;
+    this.hud.setShareStatus('saving', '正在生成你的水墨战帖…');
+    try {
+      this.renderFrame();
+      const wave = Math.max(1, this.waves.wave || this.state.wave);
+      const card = composeBattleCard(this.canvas, {
+        ...this.roundStats,
+        score: this.state.score,
+        wave,
+        healthRemaining: this.player.health,
+        victory: this.state.mode === 'victory',
+      });
+      const dataUrl = card.toDataURL('image/png');
+      void this.persistBattleCard(dataUrl);
+    } catch (error) {
+      this.savingBattleCard = false;
+      this.hud.setShareStatus('error', saveBattleCardError(error));
+    }
+  };
+
+  private async persistBattleCard(dataUrl: string): Promise<void> {
+    try {
+      const result = await saveBattleCard(dataUrl);
+      this.hud.setShareStatus(
+        'saved',
+        result === 'album' ? '战帖已保存到相册。' : '战帖已下载为 PNG 图片。',
+      );
+    } catch (error) {
+      this.hud.setShareStatus('error', saveBattleCardError(error));
+    } finally {
+      this.savingBattleCard = false;
+    }
+  }
+
   private readonly handleOverlayClick = (): void => {
     if (this.state.mode !== 'paused') return;
     this.audio.resume();
@@ -516,6 +559,9 @@ export class Game {
 
   private beginRound(): void {
     this.state.reset();
+    this.roundStats = this.createRoundStats();
+    this.savingBattleCard = false;
+    this.hud.resetShareStatus();
     this.input.setPointerFallback(false);
     this.player.yaw = 0;
     this.player.pitch = -0.035;
@@ -923,6 +969,11 @@ export class Game {
         reflected: event.deathCause === 'reflected',
         boss: event.kind === 'boss',
       });
+      this.roundStats.kills += 1;
+      if (headshot) this.roundStats.headshots += 1;
+      if (event.deathCause === 'reflected') this.roundStats.reflectedKills += 1;
+      if (event.deathCause === 'melee') this.roundStats.meleeKills += 1;
+      this.roundStats.maxCombo = Math.max(this.roundStats.maxCombo, this.state.combo);
       if (event.deathCause !== 'fall') this.flashImpactFrame();
       const direction = event.direction?.clone()
         ?? recent?.direction?.clone()
@@ -1053,11 +1104,29 @@ export class Game {
     this.input.setPointerFallback(false);
     if (document.pointerLockElement === this.canvas) void document.exitPointerLock();
     this.capturePlayback = false;
+    this.roundStats.score = this.state.score;
+    this.roundStats.wave = Math.max(1, this.waves.wave || this.state.wave);
+    this.roundStats.healthRemaining = this.player.health;
+    this.roundStats.victory = mode === 'victory';
     this.setMode(mode);
     this.weapons.setTrigger(false);
     this.weapons.setAimHeld(false);
     this.enemies.projectilePool.clear();
     if (mode === 'victory') this.enemies.reset();
+  }
+
+  private createRoundStats(): BattleCardStats {
+    return {
+      score: 0,
+      wave: 1,
+      kills: 0,
+      headshots: 0,
+      reflectedKills: 0,
+      meleeKills: 0,
+      maxCombo: 0,
+      healthRemaining: 100,
+      victory: false,
+    };
   }
 
   private populateStressScene(): void {
