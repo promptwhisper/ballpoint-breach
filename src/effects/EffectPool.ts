@@ -822,9 +822,15 @@ export class EffectPool {
     const casingEdges = new THREE.EdgesGeometry(casingGeometry, 12);
     const shardGeometry = INK_STYLE ? new THREE.TetrahedronGeometry(0.72, 0) : casingGeometry;
     const shardEdges = INK_STYLE ? new THREE.EdgesGeometry(shardGeometry, 8) : casingEdges;
-    const casingMaterial = new THREE.MeshBasicMaterial({ color: INK_STYLE ? 0x9a7a4f : COLORS.orange });
-    const casingLightMaterial = new THREE.MeshBasicMaterial({ color: INK_STYLE ? 0xc0a26f : COLORS.orange });
-    const casingDarkMaterial = new THREE.MeshBasicMaterial({ color: INK_STYLE ? 0x51483e : 0x8e6333 });
+    const casingMaterial = new THREE.MeshBasicMaterial({ color: INK_STYLE ? 0x5e6056 : COLORS.orange });
+    const casingLightMaterial = new THREE.MeshBasicMaterial({ color: INK_STYLE ? 0x91826a : COLORS.orange });
+    const casingDarkMaterial = new THREE.MeshBasicMaterial({ color: INK_STYLE ? 0x11191b : 0x8e6333 });
+    const casingWashMaterial = new THREE.MeshBasicMaterial({
+      color: 0x20292b,
+      transparent: true,
+      opacity: 0.96,
+      depthWrite: true,
+    });
     const casingOutline = new THREE.LineBasicMaterial({ color: INK_STYLE ? 0x202426 : 0x403372, transparent: true, opacity: 0.92 });
     const cartridgeParts = (INK_STYLE ? [
       { name: 'case-body', geometry: new THREE.CylinderGeometry(0.48, 0.53, 0.68, 8), material: casingMaterial, y: -0.08 },
@@ -835,7 +841,15 @@ export class EffectPool {
     ] : []).map((part) => ({ ...part, edges: new THREE.EdgesGeometry(part.geometry, 14) }));
     const mouthGeometry = INK_STYLE ? new THREE.TorusGeometry(0.32, 0.045, 4, 10) : null;
     mouthGeometry?.rotateX(Math.PI / 2);
-    const washBandGeometry = INK_STYLE ? new THREE.CylinderGeometry(0.505, 0.505, 0.024, 8) : null;
+    const washArcs = INK_STYLE ? [
+      { y: -0.27, height: 0.24, thetaStart: -0.35, thetaLength: 3.25 },
+      { y: 0.02, height: 0.3, thetaStart: 1.88, thetaLength: 3 },
+      { y: 0.29, height: 0.17, thetaStart: 0.55, thetaLength: 2.4 },
+    ].map((arc) => ({
+      ...arc,
+      geometry: new THREE.CylinderGeometry(0.535, 0.535, arc.height, 9, 1, true, arc.thetaStart, arc.thetaLength),
+    })) : [];
+    const inkDropGeometry = INK_STYLE ? new THREE.SphereGeometry(0.09, 5, 4) : null;
     for (let index = 0; index < casingCapacity; index += 1) {
       const object = new THREE.Group();
       object.name = `ejected-casing-${index}`;
@@ -866,13 +880,24 @@ export class EffectPool {
           mouth.position.y = 0.57;
           cartridge.add(mouth);
         }
-        if (washBandGeometry) {
-          for (const y of [-0.27, 0.06]) {
-            const band = new THREE.Mesh(washBandGeometry, casingDarkMaterial);
-            band.name = 'case-ink-wash-band';
-            band.position.y = y;
-            band.scale.set(1, 1, 0.985);
-            cartridge.add(band);
+        for (const arc of washArcs) {
+          const band = new THREE.Mesh(arc.geometry, casingWashMaterial);
+          band.name = 'case-ink-wash-band';
+          band.position.y = arc.y;
+          cartridge.add(band);
+        }
+        if (inkDropGeometry) {
+          const inkDrops = [
+            { position: [0.5, -0.39, 0.08], scale: [0.72, 1.75, 0.42] },
+            { position: [-0.22, 0.1, -0.49], scale: [0.5, 1.15, 0.68] },
+            { position: [0.3, 0.35, 0.35], scale: [0.42, 0.9, 0.5] },
+          ] as const;
+          for (const drop of inkDrops) {
+            const splatter = new THREE.Mesh(inkDropGeometry, casingDarkMaterial);
+            splatter.name = 'case-ink-splatter';
+            splatter.position.set(drop.position[0], drop.position[1], drop.position[2]);
+            splatter.scale.set(drop.scale[0], drop.scale[1], drop.scale[2]);
+            cartridge.add(splatter);
           }
         }
       } else {

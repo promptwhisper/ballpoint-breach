@@ -65,6 +65,7 @@ try {
       'case-primer',
       'case-mouth-ring',
       'case-ink-wash-band',
+      'case-ink-splatter',
     ];
     const presentParts = requiredParts.filter(name => Boolean(spent.getObjectByName(name)));
     renderer.render(scene, camera);
