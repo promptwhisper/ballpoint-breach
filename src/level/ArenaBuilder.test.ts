@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
+import { PhysicsWorld } from '../physics/PhysicsWorld';
 import { getOutlineCacheStats } from '../render/OutlinedMesh';
-import { ArenaBuilder } from './ArenaBuilder';
+import { ArenaBuilder, type ArenaCollider } from './ArenaBuilder';
 
 function isFiniteVector(vector: THREE.Vector3): boolean {
   return Number.isFinite(vector.x) && Number.isFinite(vector.y) && Number.isFinite(vector.z);
@@ -18,6 +19,19 @@ test('arena exposes complete gameplay contracts and valid AABB colliders', () =>
     assert.ok(arena.breakables.length >= 4, 'needs multiple breakable barricades');
     assert.ok(arena.raycastMeshes.length > 40, 'arena surfaces should be raycastable');
     assert.ok(arena.colliders.length > 30, 'arena requires explicit collision coverage');
+
+    const stairLandings = arena.colliders.filter((collider) => collider.tags.includes('landing'));
+    assert.equal(stairLandings.length, 10, 'every authored stair flight needs a walkable top landing');
+    for (const landing of stairLandings) {
+      const connectedPlatform = arena.colliders.some((candidate) => {
+        if (candidate === landing || candidate.tags.includes('stairs')) return false;
+        if (candidate.category !== 'platform') return false;
+        const overlapX = Math.min(landing.max.x, candidate.max.x) - Math.max(landing.min.x, candidate.min.x);
+        const overlapZ = Math.min(landing.max.z, candidate.max.z) - Math.max(landing.min.z, candidate.min.z);
+        return overlapX >= 0.5 && overlapZ >= 0.5 && Math.abs(landing.max.y - candidate.max.y) <= 0.04;
+      });
+      assert.ok(connectedPlatform, `${landing.id} must overlap a destination platform at the same height`);
+    }
 
     const ids = new Set<string>();
     for (const collider of arena.colliders) {
@@ -63,6 +77,62 @@ test('waypoint graph is connected, bidirectional, and avoids dead ends', () => {
     assert.equal(graph.nodes.filter((node) => node.neighbors.length < 2).length, 0, 'waypoints should not create dead ends');
     assert.ok(graph.nodes.some((node) => node.tags.includes('stairs')));
     assert.ok(graph.nodes.some((node) => node.tags.includes('marksman')));
+  } finally {
+    arena.dispose();
+  }
+});
+
+test('every authored stair flight is climbable by the player capsule', () => {
+  const arena = new ArenaBuilder().build();
+  try {
+    const flights = new Map<string, Array<{ collider: ArenaCollider; index: number }>>();
+    for (const collider of arena.colliders) {
+      const match = collider.id.match(/^collider-(.+)-step-(\d+)$/);
+      if (!match) continue;
+      const [, flightId, stepIndex] = match;
+      assert.ok(flightId && stepIndex);
+      const flight = flights.get(flightId) ?? [];
+      flight.push({ collider, index: Number(stepIndex) });
+      flights.set(flightId, flight);
+    }
+
+    assert.equal(flights.size, 10, 'expected all ten authored stair flights');
+    const world = new PhysicsWorld(arena.colliders);
+    const capsule = { radius: 0.34, height: 1.72, stepHeight: 0.46, gravity: 25 };
+
+    for (const [flightId, flight] of flights) {
+      flight.sort((left, right) => left.index - right.index);
+      const first = flight[0]?.collider;
+      const second = flight[1]?.collider;
+      const last = flight.at(-1)?.collider;
+      assert.ok(first && second && last, `${flightId} needs enough steps to test`);
+
+      const firstCenter = first.min.clone().add(first.max).multiplyScalar(0.5);
+      const lastCenter = last.min.clone().add(last.max).multiplyScalar(0.5);
+      const direction = lastCenter.clone().sub(firstCenter).setY(0).normalize();
+      const stepRise = second.max.y - first.max.y;
+      const body = {
+        position: firstCenter.clone().addScaledVector(direction, -0.12),
+        velocity: new THREE.Vector3(),
+        grounded: true,
+      };
+      body.position.y = first.max.y - stepRise;
+
+      let peakFeetY = body.position.y;
+      for (let frame = 0; frame < 1600; frame += 1) {
+        body.velocity.x = direction.x * 3;
+        body.velocity.z = direction.z * 3;
+        world.moveCapsule(body, 1 / 240, capsule);
+        peakFeetY = Math.max(peakFeetY, body.position.y);
+        const progress = body.position.clone().sub(firstCenter).dot(direction);
+        if (progress >= firstCenter.distanceTo(lastCenter) + 0.05) break;
+      }
+
+      assert.ok(
+        peakFeetY >= last.max.y - 0.08,
+        `${flightId} blocked at y=${peakFeetY.toFixed(2)} before top y=${last.max.y.toFixed(2)}`,
+      );
+    }
   } finally {
     arena.dispose();
   }

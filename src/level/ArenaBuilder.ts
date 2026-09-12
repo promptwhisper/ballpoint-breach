@@ -621,6 +621,31 @@ class ArenaAssembler {
       );
     }
 
+    // Every flight ends on a real walkable landing. Several authored stairs sit
+    // just outside a roof or scaffold edge; the landing bridges that visual seam
+    // so the player capsule never has to jump across an invisible gap.
+    const landingDepth = Math.max(0.7, (runLength / steps) * 1.35);
+    const approachPosition = start.clone().addScaledVector(direction, -landingDepth * 0.5);
+    approachPosition.y = start.y - 0.09;
+    this.addBox(
+      parent,
+      `${id}-approach`,
+      new THREE.Vector3(width * 2, 0.18, landingDepth),
+      approachPosition,
+      materialName,
+      { collider: 'platform', tags: ['stairs', id, 'approach'], rotation: new THREE.Euler(0, yaw, 0) },
+    );
+    const landingPosition = end.clone().addScaledVector(direction, landingDepth * 0.5);
+    landingPosition.y = end.y - 0.09;
+    this.addBox(
+      parent,
+      `${id}-landing`,
+      new THREE.Vector3(width * 2, 0.18, landingDepth),
+      landingPosition,
+      materialName,
+      { collider: 'platform', tags: ['stairs', id, 'landing'], rotation: new THREE.Euler(0, yaw, 0) },
+    );
+
     const perpendicular = new THREE.Vector3(-direction.z, 0, direction.x).multiplyScalar(width * 0.48);
     for (const [sideIndex, sign] of [-1, 1].entries()) {
       const offset = perpendicular.clone().multiplyScalar(sign);
@@ -701,12 +726,12 @@ class ArenaAssembler {
       const starts = [
         new THREE.Vector3(-10.6, low, -6.95),
         new THREE.Vector3(-5.35, low, -6.95),
-        new THREE.Vector3(-0.65, low, -6.95),
+        new THREE.Vector3(-9.6, low, -6.95),
       ];
       const ends = [
         new THREE.Vector3(-5.7, high, -6.95),
         new THREE.Vector3(-0.65, high, -6.95),
-        new THREE.Vector3(-5.35, high, -6.95),
+        new THREE.Vector3(-5.7, high, -6.95),
       ];
       this.addStairFlight(group, `scaffold-flight-${level}`, starts[level], ends[level], 1.42, 13);
     }
@@ -814,7 +839,7 @@ class ArenaAssembler {
       this.root,
       'west-yard-roof-stairs',
       new THREE.Vector3(-22.45, 0.18, 0.1),
-      new THREE.Vector3(-22.45, 5.5, -7.2),
+      new THREE.Vector3(-22.45, 5.5, -6.8),
       1.55,
       20,
     );
@@ -824,8 +849,8 @@ class ArenaAssembler {
     this.addStairFlight(
       this.root,
       'utility-exterior-stairs',
-      new THREE.Vector3(15.75, 0.18, -9.6),
-      new THREE.Vector3(15.75, 5.2, -15.9),
+      new THREE.Vector3(16.15, 0.18, -9.6),
+      new THREE.Vector3(16.15, 5.2, -13.8),
       1.55,
       18,
     );
@@ -835,8 +860,8 @@ class ArenaAssembler {
     this.addStairFlight(
       this.root,
       'office-roof-stairs',
-      new THREE.Vector3(26.05, 0.18, 1.1),
-      new THREE.Vector3(26.05, 3.72, -3.5),
+      new THREE.Vector3(26.3, 0.18, 1.1),
+      new THREE.Vector3(26.3, 3.7, -1.9),
       1.45,
       15,
     );
@@ -922,10 +947,10 @@ class ArenaAssembler {
     this.addStairFlight(
       group,
       'service-catwalk-return',
-      new THREE.Vector3(11.45, 0.18, -3.4),
-      new THREE.Vector3(11.45, 3.76, -5.35),
+      new THREE.Vector3(11.45, 0.18, 2.0),
+      new THREE.Vector3(11.45, 3.76, -4.55),
       1.35,
-      16,
+      18,
     );
 
     this.addBox(group, 'rear-transit-deck', new THREE.Vector3(58, 0.3, 6.2), new THREE.Vector3(0, 5.12, -32.2), 'deep', {
