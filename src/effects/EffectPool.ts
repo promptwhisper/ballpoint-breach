@@ -20,11 +20,14 @@ interface DebrisSlot {
 
 interface CasingSlot {
   object: THREE.Group;
+  cartridge: THREE.Group;
+  shard: THREE.Group;
   velocity: THREE.Vector3;
   spin: THREE.Vector3;
   life: number;
   maxLife: number;
   floorY: number;
+  muzzleShard: boolean;
 }
 
 interface SmokeSlot {
@@ -817,17 +820,70 @@ export class EffectPool {
 
     const casingGeometry = new THREE.BoxGeometry(1, 1, 1);
     const casingEdges = new THREE.EdgesGeometry(casingGeometry, 12);
-    const casingMaterial = new THREE.MeshBasicMaterial({ color: INK_STYLE ? 0x655b4e : COLORS.orange });
+    const shardGeometry = INK_STYLE ? new THREE.TetrahedronGeometry(0.72, 0) : casingGeometry;
+    const shardEdges = INK_STYLE ? new THREE.EdgesGeometry(shardGeometry, 8) : casingEdges;
+    const casingMaterial = new THREE.MeshBasicMaterial({ color: INK_STYLE ? 0x9a7a4f : COLORS.orange });
+    const casingLightMaterial = new THREE.MeshBasicMaterial({ color: INK_STYLE ? 0xc0a26f : COLORS.orange });
+    const casingDarkMaterial = new THREE.MeshBasicMaterial({ color: INK_STYLE ? 0x51483e : 0x8e6333 });
     const casingOutline = new THREE.LineBasicMaterial({ color: INK_STYLE ? 0x202426 : 0x403372, transparent: true, opacity: 0.92 });
+    const cartridgeParts = (INK_STYLE ? [
+      { name: 'case-body', geometry: new THREE.CylinderGeometry(0.48, 0.53, 0.68, 8), material: casingMaterial, y: -0.08 },
+      { name: 'case-shoulder', geometry: new THREE.CylinderGeometry(0.34, 0.48, 0.18, 8), material: casingLightMaterial, y: 0.35 },
+      { name: 'case-neck', geometry: new THREE.CylinderGeometry(0.33, 0.34, 0.12, 8), material: casingMaterial, y: 0.5 },
+      { name: 'case-base-rim', geometry: new THREE.CylinderGeometry(0.59, 0.59, 0.075, 10), material: casingDarkMaterial, y: -0.46 },
+      { name: 'case-primer', geometry: new THREE.CylinderGeometry(0.18, 0.18, 0.025, 10), material: casingLightMaterial, y: -0.505 },
+    ] : []).map((part) => ({ ...part, edges: new THREE.EdgesGeometry(part.geometry, 14) }));
+    const mouthGeometry = INK_STYLE ? new THREE.TorusGeometry(0.32, 0.045, 4, 10) : null;
+    mouthGeometry?.rotateX(Math.PI / 2);
+    const washBandGeometry = INK_STYLE ? new THREE.CylinderGeometry(0.505, 0.505, 0.024, 8) : null;
     for (let index = 0; index < casingCapacity; index += 1) {
       const object = new THREE.Group();
       object.name = `ejected-casing-${index}`;
       object.visible = false;
       object.frustumCulled = false;
-      const body = new THREE.Mesh(casingGeometry, casingMaterial);
-      const outline = new THREE.LineSegments(casingEdges, casingOutline);
-      outline.scale.setScalar(1.035);
-      object.add(body, outline);
+      const shard = new THREE.Group();
+      shard.name = 'muzzle-paper-shard';
+      const shardBody = new THREE.Mesh(shardGeometry, casingMaterial);
+      const shardOutline = new THREE.LineSegments(shardEdges, casingOutline);
+      shardOutline.scale.setScalar(1.035);
+      shard.add(shardBody, shardOutline);
+
+      const cartridge = new THREE.Group();
+      cartridge.name = 'spent-cartridge';
+      if (INK_STYLE) {
+        for (const part of cartridgeParts) {
+          const body = new THREE.Mesh(part.geometry, part.material);
+          body.name = part.name;
+          body.position.y = part.y;
+          const outline = new THREE.LineSegments(part.edges, casingOutline);
+          outline.position.y = part.y;
+          outline.scale.setScalar(1.018);
+          cartridge.add(body, outline);
+        }
+        if (mouthGeometry) {
+          const mouth = new THREE.Mesh(mouthGeometry, casingDarkMaterial);
+          mouth.name = 'case-mouth-ring';
+          mouth.position.y = 0.57;
+          cartridge.add(mouth);
+        }
+        if (washBandGeometry) {
+          for (const y of [-0.27, 0.06]) {
+            const band = new THREE.Mesh(washBandGeometry, casingDarkMaterial);
+            band.name = 'case-ink-wash-band';
+            band.position.y = y;
+            band.scale.set(1, 1, 0.985);
+            cartridge.add(band);
+          }
+        }
+      } else {
+        const body = new THREE.Mesh(casingGeometry, casingMaterial);
+        const outline = new THREE.LineSegments(casingEdges, casingOutline);
+        outline.scale.setScalar(1.035);
+        cartridge.add(body, outline);
+      }
+      shard.visible = false;
+      cartridge.visible = true;
+      object.add(shard, cartridge);
       object.traverse((part) => {
         part.layers.set(1);
         part.renderOrder = 22;
@@ -835,11 +891,14 @@ export class EffectPool {
       this.root.add(object);
       this.casingSlots.push({
         object,
+        cartridge,
+        shard,
         velocity: new THREE.Vector3(),
         spin: new THREE.Vector3(),
         life: 0,
         maxLife: 1,
         floorY: 0.045,
+        muzzleShard: false,
       });
     }
 
@@ -1160,6 +1219,9 @@ export class EffectPool {
     slot.life = slot.maxLife = isMuzzleShard
       ? 0.16 + deterministic(pending.shotId, 151) * 0.07
       : profile.casingLifetime;
+    slot.muzzleShard = isMuzzleShard;
+    slot.shard.visible = isMuzzleShard;
+    slot.cartridge.visible = !isMuzzleShard;
     slot.floorY = Math.max(0.045, pending.position.y - 1.45);
     slot.object.visible = true;
     slot.object.position.copy(pending.position)
@@ -1644,7 +1706,7 @@ export class EffectPool {
       slot.object.rotation.x += slot.spin.x * dt;
       slot.object.rotation.y += slot.spin.y * dt;
       slot.object.rotation.z += slot.spin.z * dt;
-      const halfHeight = Math.max(0.028, slot.object.scale.y * 0.36);
+      const halfHeight = Math.max(0.028, slot.object.scale.y * (slot.muzzleShard ? 0.36 : 0.58));
       if (slot.object.position.y < slot.floorY + halfHeight) {
         slot.object.position.y = slot.floorY + halfHeight;
         if (Math.abs(slot.velocity.y) > 0.55) slot.velocity.y *= -0.3;
