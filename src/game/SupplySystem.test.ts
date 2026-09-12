@@ -33,7 +33,6 @@ function makeArena(points: SupplyPoint[]): { arena: ArenaBuildResult; objects: M
     enemySpawnPoints: [],
     enemySpawns: [],
     supplyPoints: points,
-    grappleAnchors: [],
     ledges: [],
     waypointGraph: null as unknown as ArenaBuildResult['waypointGraph'],
     breakables: [],

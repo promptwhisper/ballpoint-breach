@@ -28,7 +28,6 @@ export const MESSAGE_COPY: Record<string, string> = {
   'POINTER LOCK UNAVAILABLE · MOVE THE CURSOR TO LOOK · ESC PAUSES': '移动鼠标转动视角 · 按退出键暂停',
   'TAP RIGHT TO FIRE · DRAG TO LOOK · HOLD FOR AUTO FIRE': '轻触右侧射击 · 拖动转向 · 长按连续射击',
   'LOW POWER MODE': '已自动降低画质 · 操作保持流畅',
-  'Q grapples enemies and the marked anchor points': '按 Q 发射钩索 · 可牵引敌人与标记锚点',
   'PERFECT RETURN!': '完美反弹',
   'BLOCK BROKEN': '格挡耗尽',
   'BLOCKED': '格挡成功',

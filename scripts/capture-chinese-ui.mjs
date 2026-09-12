@@ -61,7 +61,7 @@ try {
     }
     const names = ['RIFLE','SHOTGUN','REVOLVER','SNIPER','KATANA'];
     const weaponLabels = names.map((name, index) => {
-      hud.render({ score:1234, wave:5, enemiesLeft:7, health:82, maxHealth:100, grappleRatio:1,
+      hud.render({ score:1234, wave:5, enemiesLeft:7, health:82, maxHealth:100,
         weapons:[{slot:index+1,name,description:'fallback should never be visible',ammo:5,reserve:30,selected:true}],
         boss:{name:'THE DOODLER',health:500,maxHealth:1000} });
       return {name:document.querySelector('[data-hud="weapon-name"]').textContent,

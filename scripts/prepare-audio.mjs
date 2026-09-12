@@ -15,7 +15,6 @@ const clips = [
   ['hit', 'tinysized/sfx-cc0/apple-cut-01.wav', 0.55],
   ['headshot', 'tinysized/sfx-cc0/wood-twigs-break-01.wav', 0.55],
   ['reload', 'clipload1.wav', 0.5],
-  ['grapple', 'tinysized/sfx-cc0/handcuffs-metal-lock-01.wav', 0.75],
   ['hurt', 'tinysized/sfx-cc0/boots-leather-jump-01.wav', 0.85],
   ['wave', 'tinysized/sfx-cc0/metal-hammer-hit-02.wav', 1.2],
   ['boss', 'tinysized/sfx-cc0/sword-clash-01.wav', 1.2],

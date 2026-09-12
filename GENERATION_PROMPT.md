@@ -51,11 +51,11 @@ Build a connected, traversable construction complex containing:
 - a dominant four-level exposed scaffold with repeated columns, slabs, rails, and exterior stair runs;
 - a long rear undercroft/transit deck with at least 50 world units of repeated supports;
 - a freestanding utility building with punched windows, doorway, roof rail, and exterior stairs;
-- remote west and east routes, perimeter walls, elevated catwalks, roof decks, ledges, pipes, crates, low barriers, supplies, grapple anchors, and orange breakable barricades;
+- remote west and east routes, perimeter walls, elevated catwalks, roof decks, ledges, pipes, crates, low barriers, supplies, and orange breakable barricades;
 - a construction crane with an ochre-accented boom, brace, cable, and hook;
 - one folded-paper reconnaissance aircraft in the upper sky, built from pale paper panels with indigo outlines and fold lines. It follows a deterministic approximately `32 s` world-space patrol and stays behind gameplay silhouettes.
 
-The navigation graph must connect at least two ground routes and one elevated route between remote wings and the core. Register visible stairs, ledges, colliders, waypoints, enemy spawns, supplies, and grapple anchors to the same world layout.
+The navigation graph must connect at least two ground routes and one elevated route between remote wings and the core. Register visible stairs, ledges, colliders, waypoints, enemy spawns, and supplies to the same world layout.
 
 ### Regular NPC
 
@@ -99,14 +99,12 @@ Implement five switchable weapons with guarded transitions, ammunition, reloads,
 
 The katana attack must use authored wind-up, contact, follow-through, and recovery poses across multiple rotation axes. Apply damage once when the blade crosses the target—not on mouse-down. Alternate forward and reverse trajectories and show a short broken blue-ink arc only around contact. Right mouse holds a finite-stamina block and permits correctly timed projectile reflection.
 
-Q fires a bounded blue grapple line. It must stop at world geometry, pull enemies toward the player, lightly pull the player toward designated anchors, and respect cooldown.
-
 ### Reticle and HUD
 
 - Reconstruct the rifle reticle at the reference scale: an indigo dashed ring around `34–36 px` across, a `4 px` red centre dot, and four red ticks around `12–13 × 3–4 px`.
 - Tick inner edges should sit roughly `22 px` from centre while idle, expand to about `38 px` while moving, and about `77 px` while sprinting.
 - Do not substitute a generic four-tick FPS crosshair.
-- Reproduce the handwritten score, wave/enemy count, HP bar, ammo, weapon list, contextual hint, grapple/block meters, scope, boss health, victory, defeat, and restart UI.
+- Reproduce the handwritten score, wave/enemy count, HP bar, ammo, weapon list, contextual hint, block meter, scope, boss health, victory, defeat, and restart UI.
 - Start on an explicit click-to-enter screen. If Pointer Lock is rejected, continue in a usable unlocked fallback mode rather than instantly pausing. Escape pauses and releases controls; clicking resumes.
 
 ### Combat feedback
@@ -185,7 +183,7 @@ The project is complete only when:
 - the large arena, architectural relationships, NPC/building scale, first-person framing, palette, hatch density, and HUD survive side-by-side screenshot comparison with the reference;
 - every regular NPC reads as the same source character family while showing bounded individual drawing variation;
 - death ink clearly passes through silhouette, directional breakup, wall/floor deposition, and persistent-history stages;
-- all controls, five weapons, grapple, enemy classes, navigation recovery, five waves, boss, victory, defeat, and restart work in the browser;
+- all controls, five weapons, enemy classes, navigation recovery, five waves, boss, victory, defeat, and restart work in the browser;
 - normal start/resume does not immediately pause when Pointer Lock is unavailable;
 - `npm run typecheck`, `npm test`, and `npm run build` pass;
 - the browser shows no sustained runtime or shader errors;

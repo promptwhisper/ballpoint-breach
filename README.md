@@ -50,7 +50,6 @@ npm run build
 | Right mouse | Aim / katana block |
 | R | Reload |
 | 1–5 / wheel | Switch weapon |
-| Q | Grapple an enemy or anchor |
 | Escape | Release pointer and pause |
 
 Click or tap the start button to enter the arena. This mini-tool branch uses unlocked cursor/touch controls so it works inside embedded WebViews. On phones, use the circular movement area on the left; drag the playfield to look; tap or hold the right side to fire. The settings button can switch to a dedicated firing button and adjust look sensitivity.
@@ -69,13 +68,11 @@ The arsenal contains:
 - a five-round bolt-action sniper with a circular scope;
 - a katana with an arc slash, finite block stamina, and timed projectile returns.
 
-Q fires a bounded grapple line: dark ink in the ink-wash style and blue in the original ballpoint style. Enemy hits pull the target toward the player; designated arena anchors lightly pull the player. World ray tests prevent grapples and gunfire from passing through walls.
-
 ## Architecture
 
-- `src/game/` owns the main loop, state, world queries, supplies, and grapple integration.
+- `src/game/` owns the main loop, state, world queries, and supplies.
 - `src/render/` contains the selectable ballpoint and ink-wash materials, shared palettes, and cached outline helper.
-- `src/level/` procedurally assembles the construction arena, colliders, waypoint graph, ledges, supplies, grapple anchors, and breakables.
+- `src/level/` procedurally assembles the construction arena, colliders, waypoint graph, ledges, supplies, and breakables.
 - `src/player/` and `src/physics/` implement the kinematic capsule controller.
 - `src/combat/` contains weapon definitions, state machines, and procedural viewmodels.
 - `src/enemies/` contains reusable doodle rigs, finite-state AI, hit zones, boss logic, and the projectile pool.

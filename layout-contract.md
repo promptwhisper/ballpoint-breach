@@ -7,7 +7,7 @@ Coordinate frame: `y` is up and ground is `y = 0`. The player remains human scal
 - Main ground | broad construction complex | target bounds `x -36..36`, `z -46..32` (`72 × 78`) | about 2.2× the area of the previous `48 × 54` courtyard | reference 00:00–00:15 and 00:45–01:05.
 - Initial player area | open south foreground | spawn near `(2, 0.32, 4.5)` facing negative `z` | the nearest core masses sit about `15–18` world units behind the first enemies, so architecture dominates the frame without enlarging the NPCs | reference 00:00–00:04 and 00:42.8–00:44.0.
 - Long rear transit deck | north/rear route | at least 50 world units of continuous overhead slab/catwalk with repeated supports | must create the extended undercroft and column rhythm visible while crossing the map | reference 00:05–00:08 and 00:47–00:51.
-- West return route | far west | long orange bridge plus remote return stairs/building | should take several seconds to cross without grappling | reference 00:00–00:03 and 00:19–00:27.
+- West return route | far west | long orange bridge plus remote return stairs/building | should take several seconds to cross on foot | reference 00:00–00:03 and 00:19–00:27.
 - Core courtyard | center | scaffold, utility building, office, cover, and open fighting space | keep silhouettes readable by increasing separation, not by scaling characters down | reference 00:08–00:14 and 00:31–00:45.
 - Perimeter | distant frame | rear wall near `z = -46`, side walls near `x = ±36`, front safety edge near `z = 32` | boundaries should not feel one sprint away from the start | full video.
 
@@ -31,10 +31,10 @@ Coordinate frame: `y` is up and ground is `y = 0`. The player remains human scal
 ## Dynamic placement rules
 
 - Enemy ground spawns and navigation nodes must cover the expanded south, west, east, and rear zones; they may not remain clustered inside the old `48 × 54` footprint.
-- Elevated spawns, grapple anchors, supplies, ledges, collision bounds, and stairs must stay registered to their visible geometry after expansion.
+- Elevated spawns, supplies, ledges, collision bounds, and stairs must stay registered to their visible geometry after expansion.
 - The safe spawn must have clear collision space and a direct line of sight to the core landmarks, with nearby cover off the crosshair.
 - The expanded level must preserve at least two connected ground routes and one elevated route between the remote wings and the core.
-- The sky scout follows one closed clockwise Catmull-Rom route above the roofs (`x ≈ -15..17`, `y ≈ 12.8..15.7`, `z ≈ -44..16`) in `32 s`, banks through turns, and remains non-interactive so neither bullets nor grapples can hit it.
+- The sky scout follows one closed clockwise Catmull-Rom route above the roofs (`x ≈ -15..17`, `y ≈ 12.8..15.7`, `z ≈ -44..16`) in `32 s`, banks through turns, and remains non-interactive so bullets cannot hit it.
 
 ## Character and first-person silhouette rules
 

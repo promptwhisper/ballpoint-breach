@@ -45,14 +45,6 @@ export interface SupplyPoint {
   respawnSeconds: number;
 }
 
-export interface GrappleAnchor {
-  id: string;
-  position: THREE.Vector3;
-  radius: number;
-  strength: number;
-  tags: readonly string[];
-}
-
 export interface ArenaLedge {
   id: string;
   start: THREE.Vector3;
@@ -272,7 +264,6 @@ export interface ArenaBuildResult {
   /** Alias kept convenient for wave directors. */
   enemySpawns: readonly EnemySpawnPoint[];
   supplyPoints: readonly SupplyPoint[];
-  grappleAnchors: readonly GrappleAnchor[];
   ledges: readonly ArenaLedge[];
   waypointGraph: ArenaWaypointGraph;
   breakables: readonly BreakableBarricade[];
@@ -337,7 +328,6 @@ class ArenaAssembler {
   readonly raycastMeshes: THREE.Mesh[] = [];
   readonly enemySpawnPoints: EnemySpawnPoint[] = [];
   readonly supplyPoints: SupplyPoint[] = [];
-  readonly grappleAnchors: GrappleAnchor[] = [];
   readonly ledges: ArenaLedge[] = [];
   readonly breakables: BreakableBarricade[] = [];
 
@@ -426,7 +416,6 @@ class ArenaAssembler {
       enemySpawnPoints: Object.freeze(this.enemySpawnPoints),
       enemySpawns: Object.freeze(this.enemySpawnPoints),
       supplyPoints: Object.freeze(this.supplyPoints),
-      grappleAnchors: Object.freeze(this.grappleAnchors),
       ledges: Object.freeze(this.ledges),
       waypointGraph,
       breakables: Object.freeze(this.breakables),
@@ -1001,7 +990,7 @@ class ArenaAssembler {
       this.addCylinderBetween(group, `crane-cross-b-${level}`, new THREE.Vector3(-5.25, y0, -21.65), new THREE.Vector3(-6.35, y1, -21.65), 0.055, 'orange');
     }
     this.addBox(group, 'crane-boom', new THREE.Vector3(27, 0.34, 0.42), new THREE.Vector3(-0.5, 13.05, -22.2), 'orange', {
-      collider: 'platform', tags: ['crane', 'grapple-only'],
+      collider: 'platform', tags: ['crane'],
     });
     this.addCylinderBetween(group, 'crane-boom-top-brace-a', new THREE.Vector3(-5.8, 14.9, -22.2), new THREE.Vector3(13, 13.25, -22.2), 0.065, 'orange');
     this.addCylinderBetween(group, 'crane-boom-top-brace-b', new THREE.Vector3(-5.8, 14.9, -22.2), new THREE.Vector3(-14, 13.25, -22.2), 0.065, 'orange');
@@ -1259,27 +1248,6 @@ class ArenaAssembler {
       this.supplyPoints.push(point);
       this.addSupplyVisual(point);
     });
-
-    const anchors: Array<[string, number, number, number, readonly string[]]> = [
-      ['scaffold-west-l1', -9.8, 3.8, -8, ['scaffold']],
-      ['scaffold-east-l2', -0.2, 6.3, -13, ['scaffold']],
-      ['scaffold-roof', -5, 9.2, -13, ['scaffold', 'high']],
-      ['orange-walk', -27, 9.0, -15, ['bridge', 'high']],
-      ['utility-roof-west', 8.1, 6.5, -14, ['roof']],
-      ['utility-roof-east', 15.3, 6.5, -14, ['roof']],
-      ['office-roof', 22, 5.0, -2, ['roof']],
-      ['service-catwalk', 15.5, 5.0, -5.4, ['bridge']],
-      ['crane-hook', 7.2, 6.0, -22.2, ['crane', 'hook']],
-      ['crane-boom-near', -1, 13.3, -22.2, ['crane', 'high']],
-      ['crane-boom-far', 11.5, 13.3, -22.2, ['crane', 'high']],
-      ['rear-wall', 24, 7.6, -45.5, ['perimeter']],
-      ['pipe-rack', 30.5, 5.2, -10, ['pipes']],
-      ['rear-deck-west', -24, 6.5, -32.2, ['bridge', 'high']],
-      ['rear-deck-east', 24, 6.5, -32.2, ['bridge', 'high']],
-    ];
-    for (const [id, x, y, z, tags] of anchors) {
-      this.grappleAnchors.push({ id: `anchor-${id}`, position: new THREE.Vector3(x, y, z), radius: 0.8, strength: tags.includes('high') ? 1.15 : 0.9, tags });
-    }
 
     const ledge = (id: string, start: THREE.Vector3, end: THREE.Vector3, normal: THREE.Vector3, height: number): void => {
       this.ledges.push({ id, start, end, outwardNormal: normal.normalize(), height, lethalDrop: height >= 5 });

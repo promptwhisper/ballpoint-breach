@@ -12,7 +12,9 @@ export function buildAudioData(audioDirectory) {
     total += bytes.length;
     sounds[name.slice(0, -4)] = bytes.toString('base64');
   }
-  if (Object.keys(sounds).length !== 25 || total > 512 * 1024) throw new Error('Expected twenty-five small samples, at most 512 KiB total.');
+  const manifest = JSON.parse(readFileSync(resolve(audioDirectory, 'credits.json'), 'utf8'));
+  const expected = manifest.assets.filter((name) => name.endsWith('.mp3') && name !== 'unlock.mp3').length;
+  if (Object.keys(sounds).length !== expected || total > 512 * 1024) throw new Error(`Expected ${expected} small samples, at most 512 KiB total.`);
   return `// Downloaded samples; see audio/credits.json. Decoded in memory, never used as media URLs.\nwindow.AUDIO_DATA = ${JSON.stringify(sounds)};\n`;
 }
 

@@ -12,7 +12,6 @@ const movingFrame = {
   secondary: false,
   jumpPressed: false,
   reloadPressed: false,
-  grapplePressed: false,
   restartPressed: false,
   weaponSelection: null,
   weaponWheel: 0 as const,

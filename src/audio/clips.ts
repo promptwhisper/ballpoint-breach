@@ -8,7 +8,6 @@ export const AUDIO_CUES = {
   hit: { duration: 0.55, gain: 1.35 },
   headshot: { duration: 0.55, gain: 1.3 },
   reload: { duration: 0.5, gain: 1.12 },
-  grapple: { duration: 0.75, gain: 1.2 },
   hurt: { duration: 0.85, gain: 1.05 },
   wave: { duration: 1.2, gain: 1.2 },
   boss: { duration: 1.2, gain: 1.08 },

@@ -14,7 +14,6 @@ test('arena exposes complete gameplay contracts and valid AABB colliders', () =>
     assert.equal(arena.root.name, 'doodle-construction-arena');
     assert.ok(arena.enemySpawnPoints.length >= 12, 'needs at least twelve enemy spawns');
     assert.ok(arena.supplyPoints.length >= 6, 'needs at least six supply points');
-    assert.ok(arena.grappleAnchors.length >= 8, 'needs environment grapple anchors');
     assert.ok(arena.ledges.length >= 8, 'needs meaningful high ledges');
     assert.ok(arena.breakables.length >= 4, 'needs multiple breakable barricades');
     assert.ok(arena.raycastMeshes.length > 40, 'arena surfaces should be raycastable');

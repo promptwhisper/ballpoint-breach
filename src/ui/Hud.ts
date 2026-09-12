@@ -20,7 +20,6 @@ export interface HudSnapshot {
   health: number;
   maxHealth: number;
   weapons: HudWeaponState[];
-  grappleRatio: number;
   blockRatio?: number;
   boss?: { name: string; health: number; maxHealth: number } | null;
   scoped?: boolean;
@@ -59,7 +58,6 @@ export class Hud {
   private readonly reserve: HTMLElement;
   private readonly weaponName: HTMLElement;
   private readonly weaponDescription: HTMLElement;
-  private readonly grappleBar: HTMLElement;
   private readonly blockWrap: HTMLElement;
   private readonly blockBar: HTMLElement;
   private readonly bossWrap: HTMLElement;
@@ -103,7 +101,6 @@ export class Hud {
     this.reserve = required('[data-hud="reserve"]');
     this.weaponName = required('[data-hud="weapon-name"]');
     this.weaponDescription = required('[data-hud="weapon-description"]');
-    this.grappleBar = required('[data-hud="grapple-bar"]');
     this.blockWrap = required('#block-stamina');
     this.blockBar = required('[data-hud="block-bar"]');
     this.bossWrap = required('#boss-health');
@@ -197,7 +194,6 @@ export class Hud {
       row.classList.toggle('selected', weapon.selected);
       if (ammo) this.setText(ammo, weapon.name === 'KATANA' ? '∞' : `${weapon.ammo}/${weapon.reserve}`);
     }
-    this.grappleBar.style.setProperty('--value', `${Math.max(0, Math.min(1, snapshot.grappleRatio)) * 100}%`);
     const showBlock = snapshot.blockRatio !== undefined;
     this.blockWrap.classList.toggle('visible', showBlock);
     if (showBlock) this.blockBar.style.setProperty('--value', `${Math.max(0, Math.min(1, snapshot.blockRatio ?? 0)) * 100}%`);

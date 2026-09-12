@@ -30,7 +30,6 @@ import { Hud, type HudSnapshot } from '../ui/Hud';
 import { DEFAULT_WAVES, WaveDirector, type SpawnPointTag, type WaveEvent, type WaveRecovery } from '../waves';
 import { ArenaQueries } from './ArenaQueries';
 import { GameState, type GameMode } from './GameState';
-import { GrappleSystem } from './GrappleSystem';
 import { SupplySystem, type SupplyPickupEvent } from './SupplySystem';
 import { createGameScene } from './createGameScene';
 import { InkOutline } from '../render/InkOutline';
@@ -121,7 +120,6 @@ export class Game {
   private readonly audio = new AudioSystem();
   private readonly effects: EffectPool;
   private readonly queries: ArenaQueries;
-  private readonly grapple: GrappleSystem;
   private readonly supplies: SupplySystem;
   private readonly raycaster = new THREE.Raycaster();
   private readonly weaponMount = new THREE.Group();
@@ -266,7 +264,6 @@ export class Game {
     this.camera.add(this.weaponMount);
     this.weaponMount.add(this.weapons.viewmodelRoot);
     this.weaponMount.traverse((object) => object.layers.set(1));
-    this.grapple = new GrappleSystem(this.camera, this.player, this.arena, this.enemies, this.effects);
     this.supplies = new SupplySystem(this.arena, (event) => this.handleSupply(event));
 
     this.waves = new WaveDirector({
@@ -467,7 +464,12 @@ export class Game {
       this.input.setPointerFallback(true);
       this.capturePlayback = false;
       if (this.state.mode === 'start' || this.state.mode === 'paused') this.setMode('playing');
-      this.hud.showTip(this.settings?.values.fireMode === 'button' ? '滑动屏幕转向 · 按射击键开火 · 按住连射' : '点击右侧射击 · 滑动转向 · 按住连射', 5.2);
+      this.hud.showTip(
+        this.settings?.values.fireMode === 'button'
+          ? '滑动屏幕转向 · 按射击键开火 · 利用掩体交战'
+          : '点击右侧射击 · 滑动转向 · 利用掩体交战',
+        5.2,
+      );
       return;
     }
 
@@ -480,7 +482,7 @@ export class Game {
         this.input.setPointerFallback(false);
         this.capturePlayback = false;
         if (this.state.mode === 'start' || this.state.mode === 'paused') this.setMode('playing');
-        this.hud.showTip('鼠标转向 · 左键射击 · ESC 暂停', 4.2);
+        this.hud.showTip('鼠标转向 · 左键射击 · 右键瞄准 · ESC 暂停', 5.2);
         return;
       }
       if (this.state.mode !== 'start' && this.state.mode !== 'paused') return;
@@ -488,7 +490,7 @@ export class Game {
       this.input.setPointerFallback(true);
       this.capturePlayback = false;
       this.setMode('playing');
-      this.hud.showTip('浏览器未能锁定鼠标 · 移动鼠标转向 · ESC 暂停', 5.2);
+      this.hud.showTip('移动鼠标转向 · 左键射击 · 右键瞄准 · ESC 暂停', 5.2);
     });
   }
 
@@ -523,7 +525,6 @@ export class Game {
     this.waves.reset();
     this.effects.clear();
     this.pendingShotTrails.clear();
-    this.grapple.reset();
     this.supplies.reset();
     this.arena.resetBreakables();
     this.lastHit.clear();
@@ -548,7 +549,7 @@ export class Game {
     this.qaDamageDemoConsumed = false;
     this.roundStarted = true;
     this.waves.start();
-    this.hud.showTip('Q grapples enemies and the marked anchor points', 5.5);
+    this.hud.showTip('利用掩体交战 · 长刀可格挡并反弹来袭墨弹', 5.5);
     this.setMode('paused');
   }
 
@@ -665,7 +666,6 @@ export class Game {
     this.weaponMount.visible = weaponSnapshot.scopeState !== 'active';
     this.player.setFovTarget(weaponSnapshot.desiredFov);
 
-    this.grapple.update(simulationDelta);
     this.tryReflectProjectile(weaponSnapshot.katana.blocking);
     this.waves.update(simulationDelta);
     if (this.state.mode === 'playing') this.enemies.update(simulationDelta);
@@ -681,10 +681,6 @@ export class Game {
     if (input.weaponSelection !== null) this.weapons.selectSlot(input.weaponSelection);
     if (input.weaponWheel !== 0) this.weapons.cycleWeapon(input.weaponWheel);
     if (input.reloadPressed) this.weapons.requestReload();
-    if (input.grapplePressed) {
-      const result = this.grapple.fire();
-      if (result.fired) this.audio.play('grapple');
-    }
     if (input.restartPressed && (this.state.mode === 'defeat' || this.state.mode === 'victory')) this.beginRound();
   }
 
@@ -1332,7 +1328,6 @@ export class Game {
       enemiesLeft: wave.enemiesRemaining,
       health: this.player.health,
       maxHealth: this.player.maxHealth,
-      grappleRatio: this.grapple.readyRatio,
       blockRatio: weapon.activeWeapon === 'katana' ? weapon.katana.stamina / weapon.katana.maxStamina : undefined,
       scoped: weapon.scopeState === 'active' || weapon.scopeState === 'entering',
       reticleSpread,

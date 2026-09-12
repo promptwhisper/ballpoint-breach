@@ -100,7 +100,7 @@ body.player-hit #vignette::before{animation:player-damage-wash 680ms cubic-bezie
 .showcase #game-overlay,.showcase #wave-banner,.showcase #boss-health{display:none}
 #recording-status{position:fixed;z-index:60;top:14px;left:50%;transform:translateX(-50%);padding:7px 13px;border:1px solid rgba(39,52,143,.45);background:rgba(246,240,220,.9);color:var(--ink);font-size:12px;letter-spacing:.08em}#recording-status a{color:var(--ink-dark);font-weight:900;text-decoration:none}
 @media(max-width:900px){.hud-weapons{right:3%;min-width:145px}.hud-score,.hud-health,.hud-ammo{left:8%}.controls-grid{grid-template-columns:repeat(2,1fr)}.ability-meter{bottom:3%}}
-@media(max-width:650px){.overlay-card{padding:32px 24px 24px}.controls-grid{display:none}.hud-weapons ol{display:none}.hud-weapons{min-width:120px}.grapple-meter{display:none}}
+@media(max-width:650px){.overlay-card{padding:32px 24px 24px}.controls-grid{display:none}.hud-weapons ol{display:none}.hud-weapons{min-width:120px}}
 
 /* Ink-wash mode is an additive theme branch. The unqualified rules above remain
    the exact legacy notebook treatment used by ?style=ballpoint. */
@@ -487,7 +487,7 @@ html[data-style="ink"] #boss-health strong { font-size:30px; }
 .touch-stick{position:absolute;left:50%;top:50%;width:54px;height:54px;margin-left:-27px;margin-top:-27px;border:2px solid var(--ink);border-radius:50%;background:rgba(246,240,220,.88);box-shadow:3px 3px 0 rgba(39,52,143,.15);transform:translate(0,0)}
 .touch-stick::after{content:"";position:absolute;left:50%;top:50%;width:8px;height:8px;margin-left:-4px;margin-top:-4px;border-radius:50%;background:var(--red);opacity:.7}.touch-move.active .touch-stick{background:rgba(231,154,50,.78)}
 .touch-actions{position:absolute;right:22px;right:calc(22px + var(--safe-area-inset-right,env(safe-area-inset-right,0px)));bottom:20px;width:158px;height:176px;pointer-events:none}
-.touch-actions button{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0}.touch-actions .action-grapple{left:18px;top:17px;width:50px;height:50px;opacity:.78}.touch-actions .action-jump{right:0;top:0;width:62px;height:62px}.touch-actions .action-weapon{left:8px;bottom:6px;width:54px;height:54px;opacity:.82}.touch-actions .action-aim{right:0;bottom:0;width:68px;height:68px}.touch-actions .action-aim.active{border-color:rgba(166,31,63,.86);background:rgba(214,59,85,.76);color:var(--paper);box-shadow:4px 4px 0 rgba(39,52,143,.18)}
+.touch-actions button{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0}.touch-actions .action-jump{right:0;top:0;width:62px;height:62px}.touch-actions .action-weapon{left:8px;bottom:6px;width:54px;height:54px;opacity:.82}.touch-actions .action-aim{right:0;bottom:0;width:68px;height:68px}.touch-actions .action-aim.active{border-color:rgba(166,31,63,.86);background:rgba(214,59,85,.76);color:var(--paper);box-shadow:4px 4px 0 rgba(39,52,143,.18)}
 @media (pointer:coarse), (max-width:900px){#touch-controls{display:block}.hud-health{bottom:22%}.hud-ammo{bottom:11%}.hud-weapons{bottom:13%}#stage{bottom:2px}.overlay-card h1{font-size:64px}.overlay-card>p:not(.eyebrow){font-size:16px}}
 @media(max-width:520px){.touch-move{transform:scale(.82);transform-origin:left bottom}.touch-actions{transform:scale(.82);transform-origin:right bottom}.hud-weapons{display:none}.hud-health{left:5%;bottom:24%}.hud-ammo{left:5%;bottom:13%}}
 

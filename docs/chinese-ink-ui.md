@@ -9,11 +9,11 @@ paper backings. This presentation update does not change the ink shader.
 
 - Loading, start, pause, defeat, and victory screens.
 - Score, health, ammunition, weapons, wave state, and boss information.
-- Wave introductions, pickups, grapple feedback, blocking, and combat tips.
+- Wave introductions, pickups, blocking, and combat tips.
 - Ink recording labels and friendly runtime error messages.
 - Inspector labels; the inspector and frame-rate status are hidden by default.
 
-Physical keyboard legends such as W/A/S/D, Q, and R remain literal so players
+Physical keyboard legends such as W/A/S/D and R remain literal so players
 can identify the correct keys. Internal weapon identifiers remain unchanged;
 Chinese presentation must not affect reticle selection or ammunition logic.
 Central runtime copy lives in `src/ui/zhCN.ts`.

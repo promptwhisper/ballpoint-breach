@@ -38,7 +38,8 @@ assert.ok(html.indexOf('./audio-data.js') < html.indexOf('./assets/app.js'));
 const scope = { window: {} };
 runInNewContext(readFileSync(resolve(root, 'audio-data.js'), 'utf8'), scope, { timeout: 1000 });
 const data = scope.window.AUDIO_DATA;
-assert.equal(Object.keys(data).length, 25);
+const audioManifest = JSON.parse(readFileSync(resolve('public/audio/credits.json'), 'utf8'));
+assert.equal(Object.keys(data).length, audioManifest.assets.filter((name) => name.endsWith('.mp3') && name !== 'unlock.mp3').length);
 let total = 0;
 for (const [name, base64] of Object.entries(data)) {
   assert.match(base64, /^[A-Za-z0-9+/]+=*$/);

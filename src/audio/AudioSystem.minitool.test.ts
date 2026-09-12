@@ -75,10 +75,10 @@ test('mini-tool decodes once per cue and supports callback-only decoders', async
   const { audio } = fixture(context);
   audio.resume();
   await settle();
-  assert.equal(context.decodeCalls, 25);
+  assert.equal(context.decodeCalls, Object.keys(AUDIO_CUES).length);
   for (const sound of Object.keys(AUDIO_CUES) as GameSound[]) { audio.play(sound); await settle(); }
-  assert.equal(context.decodeCalls, 25);
-  assert.equal(context.sources.length, 25);
+  assert.equal(context.decodeCalls, Object.keys(AUDIO_CUES).length);
+  assert.equal(context.sources.length, Object.keys(AUDIO_CUES).length);
   assert.equal(context.sources.filter((source) => !source.stopped).length, 6);
   audio.dispose();
   assert.ok(context.sources.every((source) => source.stopped && source.disconnected));

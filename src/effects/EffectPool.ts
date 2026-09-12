@@ -119,16 +119,6 @@ export type FirearmEffectWeapon = 'rifle' | 'shotgun' | 'revolver' | 'sniper';
 type GoreShape = 'blob' | 'limb' | 'stroke' | 'drop';
 type SplatTextureKind = 'wall-impact' | 'wall-drip' | 'floor-pool' | 'floor-streak' | 'droplet';
 
-const GRAPPLE_DASH_WINDOWS = Object.freeze([
-  [0, 0.12],
-  [0.17, 0.27],
-  [0.32, 0.43],
-  [0.48, 0.58],
-  [0.63, 0.73],
-  [0.78, 0.87],
-  [0.92, 1],
-] as const);
-
 /** Reference-measured composition targets used by both the renderer and tests. */
 export const DEATH_INK_STYLE = Object.freeze({
   wallImpactLayers: 2,
@@ -782,9 +772,6 @@ export class EffectPool {
   private goreCursor = 0;
   private decalCursor = 0;
   private deathSequence = 0;
-  private readonly grapplePositions = new Float32Array(GRAPPLE_DASH_WINDOWS.length * 6);
-  private readonly grappleGeometry = new THREE.BufferGeometry();
-  private readonly grappleLine: THREE.LineSegments;
 
   constructor(
     scene: THREE.Scene,
@@ -1051,17 +1038,6 @@ export class EffectPool {
       this.decalSlots.push({ mesh, material, life: 0, maxLife: 1, baseOpacity: 0.9 });
     }
 
-    this.grappleGeometry.setAttribute('position', new THREE.BufferAttribute(this.grapplePositions, 3));
-    this.grappleGeometry.setDrawRange(0, INK_STYLE ? GRAPPLE_DASH_WINDOWS.length * 2 : 2);
-    this.grappleLine = new THREE.LineSegments(this.grappleGeometry, new THREE.LineBasicMaterial({
-      color: INK_STYLE ? 0x1c252a : COLORS.blue,
-      transparent: true,
-      opacity: INK_STYLE ? 0.88 : 0.96,
-    }));
-    this.grappleLine.visible = false;
-    this.grappleLine.frustumCulled = false;
-    this.grappleLine.renderOrder = 10;
-    this.root.add(this.grappleLine);
   }
 
   spawnBurst(position: THREE.Vector3, color: InkColor, scale = 0.3, lifetime = 0.24): void {
@@ -1636,34 +1612,6 @@ export class EffectPool {
     slot.groundRadius = radiusByShape[spec.shape] * Math.max(slot.mesh.scale.x, slot.mesh.scale.y, slot.mesh.scale.z);
   }
 
-  setGrapple(start: THREE.Vector3, end: THREE.Vector3, visible: boolean): void {
-    this.grappleLine.visible = visible;
-    if (!visible) return;
-    if (INK_STYLE) {
-      const deltaX = end.x - start.x;
-      const deltaY = end.y - start.y;
-      const deltaZ = end.z - start.z;
-      for (let index = 0; index < GRAPPLE_DASH_WINDOWS.length; index += 1) {
-        const window = GRAPPLE_DASH_WINDOWS[index];
-        const offset = index * 6;
-        this.grapplePositions[offset] = start.x + deltaX * window[0];
-        this.grapplePositions[offset + 1] = start.y + deltaY * window[0];
-        this.grapplePositions[offset + 2] = start.z + deltaZ * window[0];
-        this.grapplePositions[offset + 3] = start.x + deltaX * window[1];
-        this.grapplePositions[offset + 4] = start.y + deltaY * window[1];
-        this.grapplePositions[offset + 5] = start.z + deltaZ * window[1];
-      }
-    } else {
-      this.grapplePositions[0] = start.x;
-      this.grapplePositions[1] = start.y;
-      this.grapplePositions[2] = start.z;
-      this.grapplePositions[3] = end.x;
-      this.grapplePositions[4] = end.y;
-      this.grapplePositions[5] = end.z;
-    }
-    (this.grappleGeometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
-  }
-
   update(dt: number): void {
     for (let index = this.pendingCasings.length - 1; index >= 0; index -= 1) {
       const pending = this.pendingCasings[index];
@@ -1860,6 +1808,5 @@ export class EffectPool {
       slot.mesh.visible = false;
       slot.material.opacity = 0;
     }
-    this.grappleLine.visible = false;
   }
 }

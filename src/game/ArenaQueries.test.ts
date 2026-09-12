@@ -36,7 +36,6 @@ function makeArena(colliders: ArenaCollider[], waypointGraph: ArenaWaypointGraph
     enemySpawnPoints: [],
     enemySpawns: [],
     supplyPoints: [],
-    grappleAnchors: [],
     ledges: [],
     waypointGraph,
     breakables: [],

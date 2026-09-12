@@ -13,7 +13,6 @@ export type EnemyDamageType =
   | 'shotgun'
   | 'sniper'
   | 'melee'
-  | 'grapple'
   | 'reflected'
   | 'environment';
 

@@ -10,7 +10,7 @@ The project is complete only when each item below has direct build, runtime, scr
 - Camera includes restrained head bob, landing response, recoil spring, sway, and damage feedback.
 - Defeat and victory both offer a working restart.
 
-## Weapons and grapple
+## Weapons
 
 - Slots 1–5 and mouse wheel switch among rifle, shotgun, revolver, sniper, and katana with guarded state transitions.
 - Rifle: 30-round automatic fire, compact square holo, ADS.
@@ -19,7 +19,6 @@ The project is complete only when each item below has direct build, runtime, scr
 - Sniper: 5 rounds, bolt delay, FOV near 24 and circular scope overlay.
 - Katana: short arc slash, held block, finite stamina, correctly timed projectile reflection.
 - Fire-rate, ammo, reload, recoil, muzzle flash, hit marker, wall impact and enemy ink response work for every applicable weapon.
-- Q grapple cannot pass through walls, pulls enemies, lightly pulls the player at anchors, renders a blue rope, and respects cooldown.
 
 ## Arena and enemies
 
@@ -42,7 +41,7 @@ The project is complete only when each item below has direct build, runtime, scr
 - Procedural geometry only; no downloaded 3D models or texture packs.
 - Shared blue outlines and a four-band `gl_FragCoord` cross-hatch shader visibly unify arena, weapons, and characters.
 - Red damage/enemy ink, orange construction/breakables, and green supplies remain sparse accents.
-- Score, HP, ammo, weapon list, wave, enemies left, contextual tips, grapple/block meters, scope and boss bar stay legible at 1280×720 and 1920×1080.
+- Score, HP, ammo, weapon list, wave, enemies left, contextual tips, block meter, scope and boss bar stay legible at 1280×720 and 1920×1080.
 - Effects are pooled or bounded; a 15–20 enemy stress run has no unbounded object growth and remains responsive.
 - `npm test` and `npm run build` pass; browser console has no sustained errors.
 - README documents installation, port 8901, controls, architecture, and shader design.

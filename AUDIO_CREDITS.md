@@ -18,7 +18,6 @@ The game uses downloaded sound samples, not oscillators, noise generators, or AI
 | Hit | apple-cut-01.wav | Soft impact foley |
 | Headshot | wood-twigs-break-01.wav | Sharp impact foley |
 | Reload | clipload1.wav | Magazine insertion |
-| Grapple | handcuffs-metal-lock-01.wav | Metal latch foley |
 | Hurt | boots-leather-jump-01.wav | Heavy impact foley, not a vocal grunt |
 | Wave | metal-hammer-hit-02.wav | Metal announcement cue |
 | Boss | sword-clash-01.wav | Metallic warning cue |
@@ -38,7 +37,7 @@ The game uses downloaded sound samples, not oscillators, noise generators, or AI
 
 Changes: selected excerpts, shortened tails, 40 ms fade-outs, gain reduction, mono conversion, and 44.1 kHz / 96 kbps MP3 encoding. No effect waveform was synthesized. The separate 0.2-second silent `unlock.mp3` is only a user-gesture activation primer, never a game cue.
 
-The mini-tool build excludes that primer. Base64 encoding preserves each of the twenty-five prepared MP3 files byte-for-byte; it is packaging, not waveform synthesis. The authors and licenses above apply to the embedded data as well as the original files.
+The mini-tool build excludes that primer. Base64 encoding preserves each prepared MP3 file byte-for-byte; it is packaging, not waveform synthesis. The authors and licenses above apply to the embedded data as well as the original files.
 
 ## Rebuilding the audio
 

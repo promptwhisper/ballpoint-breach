@@ -109,7 +109,7 @@ try {
       assert.ok(await page.locator('#sound-toggle').isDisabled());
       assert.equal(await page.evaluate(() => window.__SCRIBBLE_SIEGE__.snapshot().mode), 'playing');
     } else {
-      await page.waitForFunction(() => window.__audioQA.decodes === 25 && document.querySelector('#sound-toggle').dataset.audioStatus === 'ready');
+      await page.waitForFunction(() => window.__audioQA.decodes === Object.keys(window.AUDIO_DATA).length && document.querySelector('#sound-toggle').dataset.audioStatus === 'ready');
       const initialStarts = await page.evaluate(() => window.__audioQA.starts);
       assert.ok(initialStarts.length <= 1, 'audio unlock must not create extra playback');
       if (initialStarts[0]) assert.ok(Math.abs(initialStarts[0].duration - 1.2) < 0.04, `only the opening-wave cue may play after unlock: ${JSON.stringify(initialStarts)}`);

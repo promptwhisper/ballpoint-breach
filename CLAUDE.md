@@ -5,6 +5,6 @@
 - Camera: solved static view, vertical FOV `31.9`, source aspect `1920:952`.
 - Palette: warm paper `#ecebdd`, indigo ink `#29277f`, lavender hatch, ochre construction accents, red enemies, mint pickups.
 - Rendering: procedural Three.js only; no downloaded models or textures. Notebook rules and HUD are screen-space; architecture, rifle, enemy, crane, and props are geometry.
-- Runtime: a complete five-wave browser FPS with five weapons, grapple, four regular enemy classes, and THE DOODLER boss.
+- Runtime: a complete ten-wave browser FPS with five weapons, four regular enemy classes, and THE DOODLER boss.
 - Review modes: `?capture=1`, `?capture=1&stress=1`, `?capture=1&ink=1`, `?capture=1&view=rear`, and `?capture=1&view=west`.
 - Large source media, extracted reference frames, and temporary review renders are intentionally excluded from the public repository.

@@ -1,5 +1,5 @@
 {
-  "assets": ["rifle.mp3", "shotgun.mp3", "revolver.mp3", "sniper.mp3", "katana.mp3", "hit.mp3", "headshot.mp3", "reload.mp3", "grapple.mp3", "hurt.mp3", "wave.mp3", "boss.mp3", "footstep.mp3", "land.mp3", "dryFire.mp3", "weaponSwitch.mp3", "pickup.mp3", "enemyFire.mp3", "worldImpact.mp3", "enemyDeath.mp3", "pump.mp3", "bolt.mp3", "waveClear.mp3", "meleeHit.mp3", "block.mp3"],
+  "assets": ["rifle.mp3", "shotgun.mp3", "revolver.mp3", "sniper.mp3", "katana.mp3", "hit.mp3", "headshot.mp3", "reload.mp3", "hurt.mp3", "wave.mp3", "boss.mp3", "footstep.mp3", "land.mp3", "dryFire.mp3", "weaponSwitch.mp3", "pickup.mp3", "enemyFire.mp3", "worldImpact.mp3", "enemyDeath.mp3", "pump.mp3", "bolt.mp3", "waveClear.mp3", "meleeHit.mp3", "block.mp3"],
   "changes": "Excerpts, shortened tails, 40ms fade-outs, gain reduction, mono conversion and MP3 encoding. No effect synthesis. unlock.mp3 is silence used only for user-gesture activation.",
   "cueOverrides": { "enemyFire.mp3": { "sourceFile": "shots/pistol.wav", "author": "Michel Baradari", "license": "CC BY 3.0", "changes": "0.30s excerpt, 5.5kHz low-pass, 40ms fade-out, volume 0.65, mono MP3. Replaces electrical discharge." } },
   "sources": [
