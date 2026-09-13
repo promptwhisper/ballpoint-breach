@@ -45,7 +45,7 @@ files. Neither runtime texture is loaded from a remote service.
 - Long Cang
   - Upstream: `google/fonts` at commit `5e35378e6bda803962ee6fd257e444a7d459660d`
   - Source file: `assets-source/fonts/LongCang-Regular.ttf` (5,162,508 bytes)
-  - Runtime file: `public/fonts/bb-ink-display-cjk.woff2` (120,832 bytes)
+  - Runtime file: `public/fonts/bb-ink-display-cjk.woff2` (174,384 bytes)
   - Modification: converted to WOFF2 and subset to the Chinese display glyphs used by the game
   - Runtime family name: `BB Ink Display`, used for titles, menu copy, buttons, weapon names, and combat callouts
   - License: SIL Open Font License 1.1; full text at `licenses/fonts/LongCang-OFL-1.1.txt`
@@ -53,11 +53,11 @@ files. Neither runtime texture is loaded from a remote service.
 - LXGW WenKai
   - Upstream: `lxgw/LxgwWenKai` at commit `50f4b182415a8c33d9a456df220b66a284e2509b`
   - Source file: `assets-source/fonts/LXGWWenKai-Regular.ttf` (25,575,676 bytes)
-  - Runtime files: `public/fonts/bb-wenkai-ui-latin.woff2` (26,036 bytes) and `public/fonts/bb-wenkai-ui-cjk.woff2` (74,748 bytes)
+  - Runtime files: `public/fonts/bb-wenkai-ui-latin.woff2` (26,036 bytes) and `public/fonts/bb-wenkai-ui-cjk.woff2` (106,940 bytes)
   - Modification: converted to WOFF2 and split into a Latin/common-symbol subset plus the Chinese UI glyphs used by the game
   - Runtime family name: `BB WenKai UI`, used for readable UI, menu, HUD, mission, and control copy
   - License: SIL Open Font License 1.1; full text at `licenses/fonts/LXGWWenKai-OFL-1.1.txt`
 
-The three runtime subsets total 221,616 bytes. `font-display: swap` is used for
+The three runtime subsets total 307,360 bytes. `font-display: swap` is used for
 all local faces. The original TTF files are retained for reproducibility and are
 not requested by the browser.
