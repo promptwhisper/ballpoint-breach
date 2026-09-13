@@ -73,6 +73,9 @@ export interface WaveDirectorOptions {
   seed?: number;
   announcementDuration?: number;
   intermissionDuration?: number;
+  canAdvanceToWave?: (wave: number) => boolean;
+  interleaveKinds?: boolean;
+  recovery?: Pick<WaveRecovery, 'healthFraction' | 'ammoFraction'>;
 }
 
 export interface WaveDirectorSnapshot {

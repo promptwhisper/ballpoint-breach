@@ -10,6 +10,10 @@ installInkInspector();
 installErrorOverlay();
 
 const params = new URLSearchParams(window.location.search);
+const requestedMode = params.get('mode');
+const levelMode = requestedMode === 'fold-foundry' || requestedMode === 'dual-pages'
+  ? requestedMode
+  : 'classic';
 const capture = params.get('capture') === '1';
 const stress = params.get('stress') === '1';
 const demoAim = params.get('aim') === '1';
@@ -42,6 +46,7 @@ if (!canvas) throw new Error('Missing #app canvas');
 const game = (() => {
   try {
     return new Game(canvas, {
+      levelMode,
       capture,
       stress,
       demoAim,

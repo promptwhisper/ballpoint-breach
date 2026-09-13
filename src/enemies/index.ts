@@ -15,6 +15,7 @@ export type { DoodleRig } from './doodleRig';
 export type {
   BossSummonRequest,
   EnemyAttackKind,
+  EnemyCombatProfile,
   EnemyDamage,
   EnemyDamageResult,
   EnemyDamageType,

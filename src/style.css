@@ -644,3 +644,43 @@ html[data-style="ink"] #touch-controls .action-fire.active{background:rgba(159,5
   html[data-style="ink"] #settings-toggle{top:70px;right:18px;width:44px;height:44px}
   #stage{display:none}
 }
+
+/* Water-ink level folios: one screen, three immediately playable maps. */
+#game-overlay[data-mode="start"] .overlay-card{
+  width:min(980px,88vw);max-width:none;padding:20px 28px 18px;transform:none;
+}
+#game-overlay[data-mode="start"] .overlay-card h1{font-size:clamp(28px,4vw,48px);line-height:1.15;margin:4px 0 7px}
+#game-overlay[data-mode="start"] #overlay-copy{margin-bottom:10px}
+#level-choices{display:flex;gap:14px;margin-top:14px;text-align:left}
+html[data-style="ink"] .overlay-card .level-card{
+  flex:1;min-width:0;padding:12px 14px;text-align:left;color:var(--ink-dark);
+  background:rgba(244,240,224,.72);border:1px solid rgba(31,29,26,.68);
+  box-shadow:3px 4px 0 rgba(43,40,35,.14);font-weight:400;
+}
+html[data-style="ink"] .overlay-card .level-card:hover:not(:disabled){background:rgba(226,218,193,.9);transform:translateY(-2px)}
+.level-card .level-number{display:block;font-size:12px;letter-spacing:.15em;color:#7d332d}
+.level-card svg{display:block;width:100%;height:74px;margin:5px 0;fill:none;stroke:currentColor;stroke-width:1.45;stroke-linecap:round;stroke-linejoin:round;opacity:.78}
+.level-card svg .accent{stroke:#8b2f2b;stroke-width:2.1}
+.level-card strong{display:block;font-family:var(--font-ink-display);font-size:25px;letter-spacing:.08em}
+.level-card small{display:block;min-height:34px;margin:4px 0 7px;font-size:12px;line-height:1.45}
+.level-card .level-meta{display:block;padding-top:7px;border-top:1px dashed rgba(31,29,26,.28);font-size:11px;color:#7d332d}
+.overlay-actions{display:flex;justify-content:center;align-items:center;gap:12px;margin-top:10px}
+#return-menu-button{color:var(--ink-dark);background:transparent;border:1px solid rgba(31,29,26,.55);box-shadow:none}
+#level-objective{position:absolute;left:50%;top:9%;transform:translateX(-50%);max-width:66%;padding:5px 12px;white-space:nowrap;text-align:center;color:var(--ink-dark);background:rgba(244,240,224,.8);border-bottom:1px solid rgba(31,29,26,.3);font-size:13px}
+body[data-game-mode="start"] #hud,body[data-game-mode="start"] #touch-controls{visibility:hidden}
+body:not([data-game-mode="playing"]) #level-objective{display:none}
+
+@media (orientation:portrait),(max-height:520px){
+  #game-overlay[data-mode="start"] .overlay-card{width:80%;padding:8px 16px 9px}
+  #game-overlay[data-mode="start"] #overlay-ink-title{font-size:34px;line-height:1;margin-bottom:0}
+  #game-overlay[data-mode="start"] .overlay-card h1{font-size:22px;margin:1px 0 3px}
+  #game-overlay[data-mode="start"] #overlay-copy{font-size:12px;line-height:1.2;margin-bottom:5px}
+  #level-choices{gap:8px;margin-top:6px}
+  html[data-style="ink"] .overlay-card .level-card{padding:6px 9px;font-size:inherit}
+  .level-card svg{height:48px;margin:1px 0}
+  .level-card strong{font-size:18px}
+  .level-card small{min-height:24px;margin:2px 0 4px;font-size:9px;line-height:1.35}
+  .level-card .level-number,.level-card .level-meta{font-size:9px}
+  .level-card .level-meta{padding-top:4px}
+  #level-objective{top:8%;font-size:10px;padding:3px 7px}
+}

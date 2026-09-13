@@ -37,6 +37,7 @@
 
       <div id="block-stamina" class="ability-meter"><span>格挡</span><i data-hud="block-bar"></i></div>
 
+      <div id="level-objective" hidden></div>
       <div id="context-tip">利用掩体交战 · 长刀可格挡并反弹来袭墨弹</div>
       <div id="wave-banner"><span id="wave-banner-ink" lang="zh-CN">破阵</span><strong id="wave-banner-title">第一阵</strong><span id="wave-banner-subtitle">初入墨境 · 击退来敌</span></div>
       <div class="crosshair"><i></i><i></i><i></i><i></i></div>
@@ -79,12 +80,29 @@
         <p class="eyebrow">水墨手绘 · 第一人称射击</p>
         <span class="ink-seal" aria-hidden="true">墨<br>戏</span>
         <p id="overlay-ink-title" lang="zh-CN">破阵</p>
-        <h1 id="overlay-title">一纸墨境 · 十阵来敌</h1>
+        <h1 id="overlay-title">三卷墨境 · 各有杀局</h1>
         <p id="overlay-copy">正在铺纸研墨，请稍候。</p>
-        <button id="start-button" type="button" disabled>正在入墨…</button>
+        <div id="level-choices" aria-label="选择关卡">
+          <button id="start-button" class="level-card" type="button" disabled aria-label="旧纸守阵">
+            <span class="level-number">卷一 · 守阵</span>
+            <svg viewBox="0 0 180 85" aria-hidden="true"><path d="M12 70h156M25 69V18h64v51M25 34h64M25 51h64M25 18l64 51M89 18L25 69M111 69V42h40v27M108 42l24-14 25 14M49 18V8h89v6M132 14v26"/><path class="accent" d="M98 11h52M137 15v14M112 47h10v11h-10M138 47h9v11h-9"/></svg>
+            <strong>旧纸守阵</strong><small>工地纵深 · 高低穿插 · 十阵鏖战</small><span class="level-meta">十阵来敌 · 墨魁压轴</span>
+          </button>
+          <button id="fold-mode-button" class="level-card" type="button" aria-label="折页铸场">
+            <span class="level-number">卷二 · 突围</span>
+            <svg viewBox="0 0 180 85" aria-hidden="true"><path d="M8 71h164M10 77h95M22 58V29h73v29ZM20 26h78M28 32v23M35 32v23M82 32v23M89 32v23M30 58v8h14v-8M73 58v8h14v-8M107 69V27l29-17 31 17v42M106 28h62M115 68V43h17v25M141 68V43h17v25M136 11v18"/><path class="accent" d="M46 30h25v27H46ZM59 33v21M108 34h58M117 24h38"/></svg>
+            <strong>折页铸场</strong><small>车厢清角 · 双门切入 · 调度楼攻坚</small><span class="level-meta">三段战区 · 六场交锋</span>
+          </button>
+          <button id="pages-mode-button" class="level-card" type="button" aria-label="双页机枢">
+            <span class="level-number">卷三 · 合围</span>
+            <svg viewBox="0 0 180 85" aria-hidden="true"><path d="M10 72h160M16 58V24h42M122 24h42v34M16 34h42M122 34h42M24 24v10M42 24v10M139 24v10M157 24v10M16 62l32-22M23 66l32-22M22 59h13M31 52h13M41 45h13M164 62l-32-22M157 66l-32-22M158 59h-13M149 52h-13M139 45h-13M65 24c0-9 50-9 50 0v36c0 10-50 10-50 0ZM65 24c0 9 50 9 50 0M84 17V6h12v11M96 10h47v13"/><path class="accent" d="M65 34c0 9 50 9 50 0M65 49c0 9 50 9 50 0M61 66h58M16 38h42M122 38h42"/></svg>
+            <strong>双页机枢</strong><small>机房环线 · 高台压制 · 折墙换道</small><span class="level-meta">三段战区 · 六场交锋</span>
+          </button>
+        </div>
         <div class="overlay-actions">
           <button id="save-card-button" type="button" hidden>保存战帖</button>
           <button id="restart-button" type="button" hidden>重新入阵</button>
+          <button id="return-menu-button" type="button" hidden>重择墨卷</button>
         </div>
         <p id="share-status" class="share-status" role="status" aria-live="polite" hidden></p>
       </div>

@@ -7,6 +7,7 @@ import {
 } from './doodleRig';
 import type {
   EnemyAttackKind,
+  EnemyCombatProfile,
   EnemyDamage,
   EnemyDamageResult,
   EnemyDeathCause,
@@ -32,6 +33,8 @@ export interface EnemyStats {
   projectileSpeed: number;
   collisionRadius: number;
   staggerThreshold: number;
+  projectileLead?: number;
+  projectileLeadLimit?: number;
 }
 
 export const ENEMY_STATS: Readonly<Record<EnemyKind, EnemyStats>> = {
@@ -99,6 +102,24 @@ export const ENEMY_STATS: Readonly<Record<EnemyKind, EnemyStats>> = {
     projectileSpeed: 18,
     collisionRadius: 0.72,
     staggerThreshold: 95,
+  },
+};
+
+// Challenge encounters use faster reactions and effective firing lanes, not extra health.
+const CHALLENGE_STATS: Record<Exclude<EnemyCombatProfile, 'classic'>, Record<EnemyKind, Partial<EnemyStats>>> = {
+  assault: {
+    grunt: { speed: 3.6, attackRange: 30, attackCooldown: 1.1, attackWindup: 0.42, attackRecovery: 0.24, projectileSpeed: 34, projectileLead: 0.7, projectileLeadLimit: 0.7 },
+    rusher: { speed: 7.2, attackWindup: 0.26, attackRecovery: 0.3 },
+    heavy: { speed: 2.2, attackRange: 24, attackCooldown: 2.1, projectileSpeed: 28, projectileLead: 0.65, projectileLeadLimit: 0.65 },
+    marksman: { speed: 2.3, attackRange: 38, attackCooldown: 2.15, attackWindup: 0.85, projectileSpeed: 46, projectileLead: 0.92, projectileLeadLimit: 0.85 },
+    boss: { speed: 3, attackCooldown: 2.35 },
+  },
+  siege: {
+    grunt: { speed: 3.8, attackRange: 28, attackCooldown: 1.15, attackWindup: 0.42, attackRecovery: 0.24, projectileSpeed: 32, projectileLead: 0.68, projectileLeadLimit: 0.7 },
+    rusher: { speed: 7.8, attackWindup: 0.26, attackRecovery: 0.3 },
+    heavy: { speed: 2.5, attackRange: 26, attackCooldown: 1.95, projectileSpeed: 30, projectileLead: 0.72, projectileLeadLimit: 0.7 },
+    marksman: { speed: 2.3, attackRange: 36, attackCooldown: 2.25, attackWindup: 0.9, projectileSpeed: 44, projectileLead: 0.9, projectileLeadLimit: 0.8 },
+    boss: { speed: 3.2, attackCooldown: 2.3 },
   },
 };
 
@@ -197,7 +218,9 @@ export class DoodleEnemy implements EnemyView {
     options: EnemySpawnOptions = {},
     despawnDelay = 2.6,
   ) {
-    this.stats = ENEMY_STATS[kind];
+    this.combatProfile = options.combatProfile ?? 'classic';
+    this.stats = this.combatProfile === 'classic' ? ENEMY_STATS[kind]
+      : { ...ENEMY_STATS[kind], ...CHALLENGE_STATS[this.combatProfile][kind] };
     this.maxHealth = this.stats.maxHealth * Math.max(0.1, options.healthScale ?? 1);
     this.health = this.maxHealth;
     this.collisionRadius = this.stats.collisionRadius;
@@ -222,6 +245,8 @@ export class DoodleEnemy implements EnemyView {
   get position(): THREE.Vector3 {
     return this.object.position;
   }
+
+  readonly combatProfile: EnemyCombatProfile;
 
   get alive(): boolean {
     return this.state !== 'dead';
@@ -371,9 +396,16 @@ export class DoodleEnemy implements EnemyView {
         return;
       }
       const useNavigation = !hasSight || this.navigationCommitTime > 0 || this.forcedNavigationTime > 0;
-      const target = useNavigation
+      let target = useNavigation
         ? context.navigationTarget(this, context.player.position) ?? context.player.position
         : context.player.position;
+      if (this.combatProfile !== 'classic' && !useNavigation && distance > 8) {
+        // Alternate approach shoulders so a whole squad does not form one shooting queue.
+        const radial = toPlayer.clone().setY(0).normalize();
+        const shoulder = new THREE.Vector3(radial.z, 0, -radial.x).multiplyScalar(this.escapeSign * 4.5);
+        const approach = context.player.position.clone().add(shoulder).addScaledVector(radial, -3);
+        if (context.hasLineOfSight(this.getEyePosition(), approach, this)) target = approach;
+      }
       this.moveToward(target, this.stats.speed, delta, context, this.forcedNavigationTime > 0);
       this.poseWalk(this.elapsed * 10);
       return;
@@ -470,7 +502,8 @@ export class DoodleEnemy implements EnemyView {
     target.y += 0.25;
     if (context.player.velocity) {
       const leadTime = origin.distanceTo(target) / Math.max(1, this.stats.projectileSpeed);
-      target.addScaledVector(context.player.velocity, Math.min(0.35, leadTime) * (this.kind === 'marksman' ? 0.75 : 0.35));
+      target.addScaledVector(context.player.velocity, Math.min(this.stats.projectileLeadLimit ?? 0.35, leadTime)
+        * (this.stats.projectileLead ?? (this.kind === 'marksman' ? 0.75 : 0.35)));
     }
     const baseDirection = target.sub(origin).normalize();
     const count = this.kind === 'heavy' ? 3 : 1;

@@ -443,10 +443,11 @@ export class WeaponSystem {
 
   cycleWeapon(delta: number): boolean {
     if (!Number.isFinite(delta) || delta === 0) return false;
-    const activeSlot = WEAPON_DEFINITIONS[this.activeWeapon].slot;
+    const activeIndex = WEAPON_IDS.indexOf(this.activeWeapon);
     const direction = delta > 0 ? 1 : -1;
-    const nextSlot = ((((activeSlot - 1) + direction) % WEAPON_IDS.length + WEAPON_IDS.length) % WEAPON_IDS.length + 1) as WeaponSlot;
-    return this.selectSlot(nextSlot);
+    const nextIndex = (activeIndex + direction + WEAPON_IDS.length) % WEAPON_IDS.length;
+    const next = WEAPON_IDS[nextIndex];
+    return next ? this.selectWeapon(next) : false;
   }
 
   requestReload(): boolean {

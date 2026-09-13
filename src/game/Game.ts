@@ -23,11 +23,11 @@ import {
   type PlayerDamageEvent,
 } from '../enemies';
 import { InputManager, type InputFrame } from '../input/InputManager';
-import { ArenaBuilder, type EnemySpawnPoint } from '../level';
+import { ArenaBuilder, type EnemySpawnPoint, type LevelMode, type ArenaBuildResult } from '../level';
 import { PhysicsWorld } from '../physics/PhysicsWorld';
 import { PlayerController } from '../player/PlayerController';
 import { Hud, type HudSnapshot } from '../ui/Hud';
-import { DEFAULT_WAVES, WaveDirector, type SpawnPointTag, type WaveEvent, type WaveRecovery } from '../waves';
+import { DEFAULT_WAVES, DUAL_PAGES_WAVES, FOLD_FOUNDRY_WAVES, WaveDirector, type SpawnPointTag, type WaveEvent, type WaveRecovery } from '../waves';
 import { ArenaQueries } from './ArenaQueries';
 import { GameState, type GameMode } from './GameState';
 import { SupplySystem, type SupplyPickupEvent } from './SupplySystem';
@@ -43,6 +43,7 @@ const PLAYER_CENTER_HEIGHT = 0.95;
 const SHOWCASE_SLASH_TIMES = [1.45, 1.88, 3.45, 3.88, 5.1, 5.53] as const;
 
 export interface GameOptions {
+  levelMode?: LevelMode;
   capture?: boolean;
   stress?: boolean;
   demoAim?: boolean;
@@ -62,6 +63,9 @@ export interface GameOptions {
 
 export interface PublicGameSnapshot {
   mode: GameMode;
+  level: LevelMode;
+  position: number[];
+  waveState: string;
   score: number;
   wave: number;
   enemies: number;
@@ -89,8 +93,8 @@ function damageType(id: Exclude<WeaponId, 'katana'>): EnemyDamageType {
 
 function spawnTags(point: EnemySpawnPoint): SpawnPointTag[] {
   const tags: SpawnPointTag[] = [point.elevation === 'ground' ? 'ground' : 'high'];
-  if (point.id === 'enemy-spawn-8') tags.push('boss');
-  if (point.preferredFor.includes('heavy')) tags.push('covered');
+  if (point.id === 'enemy-spawn-8' || point.id.endsWith('boss')) tags.push('boss');
+  if (point.preferredFor.includes('heavy') || point.id.includes('paper-cover')) tags.push('covered');
   return tags;
 }
 
@@ -109,20 +113,22 @@ export class Game {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene: THREE.Scene;
   readonly camera: THREE.PerspectiveCamera;
-  readonly arena;
+  arena: ArenaBuildResult;
   readonly player: PlayerController;
   readonly weapons: WeaponSystem;
   readonly enemies: EnemyManager;
-  readonly waves: WaveDirector;
+  waves: WaveDirector;
 
   private readonly state = new GameState();
   private readonly physics: PhysicsWorld;
   private readonly input: InputManager;
   private readonly hud: Hud;
   private readonly audio = new AudioSystem();
+  private levelMode: LevelMode;
+  private readonly summonPoints: THREE.Vector3[] = [];
   private readonly effects: EffectPool;
-  private readonly queries: ArenaQueries;
-  private readonly supplies: SupplySystem;
+  private queries: ArenaQueries;
+  private supplies: SupplySystem;
   private readonly raycaster = new THREE.Raycaster();
   private readonly weaponMount = new THREE.Group();
   private readonly aimOrigin = new THREE.Vector3();
@@ -150,7 +156,6 @@ export class Game {
   private readonly forcePointerFallback: boolean;
   private requestId = 0;
   private previousTime = performance.now();
-  private roundStarted = false;
   private capturePlayback = false;
   private smoothedFps = 60;
   private stageUpdateAt = 0;
@@ -184,6 +189,7 @@ export class Game {
   private savingBattleCard = false;
 
   constructor(readonly canvas: HTMLCanvasElement, options: GameOptions = {}) {
+    this.levelMode = options.levelMode ?? 'classic';
     this.captureMode = options.capture ?? false;
     this.stressMode = options.stress ?? false;
     this.demoAim = options.demoAim ?? false;
@@ -217,9 +223,10 @@ export class Game {
     this.camera.rotation.order = 'YXZ';
     this.scene.add(this.camera);
 
-    this.arena = new ArenaBuilder().build();
+    this.arena = new ArenaBuilder({ levelMode: this.levelMode }).build();
     this.scene.add(this.arena.root);
     this.arena.syncColliderBounds();
+    this.summonPoints.push(...this.arena.enemySpawnPoints.filter(p => p.elevation === 'ground').map(p => p.position));
     this.physics = new PhysicsWorld(this.arena.colliders);
     this.player = new PlayerController(this.camera, this.physics, this.arena.safePlayerSpawn);
     this.input = new InputManager(canvas);
@@ -243,9 +250,18 @@ export class Game {
       onEvent: (event) => this.handleEnemyEvent(event),
       fallDeathY: this.arena.killY,
       maxEnemies: 24,
-      bossSummonPoints: this.arena.enemySpawnPoints
-        .filter((point) => point.elevation === 'ground')
-        .map((point) => point.position),
+      getCombatProfile: () => this.levelMode === 'fold-foundry' ? 'assault' : this.levelMode === 'dual-pages' ? 'siege' : 'classic',
+      bossSummonPoints: this.summonPoints,
+      onBossSummon: (request) => {
+        if (this.levelMode === 'classic') return false;
+        const count = Math.min(request.count, Math.max(0, 14 - this.enemies.livingCount));
+        for (let index = 0; index < count; index += 1) {
+          const kind = request.preferredKinds[index % request.preferredKinds.length] ?? 'grunt';
+          const point = this.modeSpawnPosition(this.waves.wave, this.enemies.totalCount + index, kind, request.boss.position);
+          this.enemies.spawn(kind, point);
+        }
+        return true;
+      },
     });
 
     this.weapons = new WeaponSystem({
@@ -257,7 +273,7 @@ export class Game {
         onReflect: (request) => this.handleReflection(request),
         onMuzzle: (request) => this.handleMuzzle(request),
         onEffect: (effect) => this.handleWeaponEffect(effect),
-        onWeaponChanged: (_id, slot) => this.hud.showTip(`weapon ${slot} ready`, 1.05),
+        onWeaponChanged: (id) => this.hud.showTip(`${WEAPON_DEFINITIONS[id].label}就绪`, 1.05),
       },
     });
     // Keep every stock safely in front of the near plane. The extra mount is a
@@ -270,25 +286,7 @@ export class Game {
     this.weaponMount.traverse((object) => object.layers.set(1));
     this.supplies = new SupplySystem(this.arena, (event) => this.handleSupply(event));
 
-    this.waves = new WaveDirector({
-      spawnPoints: this.arena.enemySpawnPoints.map((point) => ({
-        id: point.id,
-        position: point.position,
-        tags: spawnTags(point),
-        weight: point.elevation === 'ground' ? 1.1 : 0.9,
-      })),
-      spawnEnemy: (kind, position) => this.enemies.spawn(kind, position),
-      getActiveEnemyCount: () => this.enemies.livingCount,
-      getPlayerPosition: () => this.player.body.position,
-      clearEnemies: () => this.enemies.reset(),
-      onEvent: (event) => this.handleWaveEvent(event),
-      onRecovery: (recovery) => this.handleRecovery(recovery),
-      definitions: this.autoplay
-        ? DEFAULT_WAVES.map((definition) => ({ ...definition, spawnInterval: 0.025 }))
-        : undefined,
-      announcementDuration: this.autoplay ? 0.06 : undefined,
-      intermissionDuration: this.autoplay ? 0.08 : undefined,
-    });
+    this.waves = this.createWaveDirector();
 
     const overlay = document.querySelector<HTMLElement>('#game-overlay');
     if (!overlay) throw new Error('Missing #game-overlay');
@@ -296,6 +294,7 @@ export class Game {
     this.installEvents();
     this.resize();
     this.state.reset();
+    this.hud.setLevelMode(this.levelMode);
     this.setMode('start');
     this.renderHud();
     this.requestId = requestAnimationFrame(this.frame);
@@ -313,16 +312,98 @@ export class Game {
     }
   }
 
+  private createWaveDirector(): WaveDirector {
+    return new WaveDirector({
+      spawnPoints: this.arena.enemySpawnPoints.map((point) => ({
+        id: point.id,
+        position: point.position,
+        tags: spawnTags(point),
+        weight: point.id.includes('paper-cover') || point.id.includes('fold-bridge')
+          ? 2.8
+          : point.elevation === 'ground' ? 1.1 : 0.9,
+      })),
+      spawnEnemy: (kind, position, context) => this.enemies.spawn(kind, this.modeSpawnPosition(context.wave, context.ordinal, kind, position)),
+      getActiveEnemyCount: () => this.enemies.livingCount,
+      getPlayerPosition: () => this.player.body.position,
+      clearEnemies: () => this.enemies.reset(),
+      onEvent: (event) => this.handleWaveEvent(event),
+      onRecovery: (recovery) => this.handleRecovery(recovery),
+      definitions: this.autoplay
+        ? this.waveDefinitions().map((definition) => ({ ...definition, spawnInterval: 0.025 }))
+        : this.levelMode === 'classic' ? undefined : this.waveDefinitions(),
+      canAdvanceToWave: (wave) => {
+        if (this.autoplay || this.levelMode === 'classic') return true;
+        const objective = this.arena.objectives?.find(o => o.firstWave === wave);
+        return !objective || this.player.body.position.distanceTo(objective.position) < 12;
+      },
+      announcementDuration: this.autoplay ? 0.06 : undefined,
+      intermissionDuration: this.autoplay ? 0.08 : undefined,
+      interleaveKinds: this.levelMode !== 'classic',
+      recovery: this.levelMode === 'classic' ? undefined : { healthFraction: 0.06, ammoFraction: 0.14 },
+    });
+  }
+
   startForCapture(): void {
     this.capturePlayback = true;
     this.beginRound();
     this.setMode('playing');
   }
 
+  private waveDefinitions() {
+    if (this.levelMode === 'fold-foundry') return FOLD_FOUNDRY_WAVES;
+    if (this.levelMode === 'dual-pages') return DUAL_PAGES_WAVES;
+    return DEFAULT_WAVES;
+  }
+
+  private modeSpawnPosition(wave: number, ordinal: number, kind: EnemyKind, fallback: THREE.Vector3): THREE.Vector3 {
+    if (this.levelMode === 'classic') return fallback;
+    const sector = Math.min(2, Math.floor((wave - 1) / 2));
+    const living = this.enemies.getLivingEnemies();
+    let candidates = this.arena.enemySpawnPoints.filter(p => p.sector === sector);
+    const specialist = candidates.filter(p => kind === 'boss' ? p.id.endsWith('boss') : kind === 'marksman' ? p.elevation === 'high' : p.elevation === 'ground' && !p.id.endsWith('boss'));
+    if (specialist.length) candidates = specialist;
+    // Once a bridge falls, nobody may respawn suspended over its old deck.
+    const supported = candidates.filter(p => this.arena.colliders.some(c => c.enabled
+      && ['ground','platform','step'].includes(c.category) && Math.abs(p.position.y - c.max.y) < 0.55
+      && p.position.x > c.min.x && p.position.x < c.max.x && p.position.z > c.min.z && p.position.z < c.max.z));
+    if (supported.length) candidates = supported;
+    else candidates = this.arena.enemySpawnPoints.filter(p => p.sector === sector && p.elevation === 'ground');
+    const clear = candidates.filter(p => !this.arena.colliders.some(c => c.enabled
+      && c.min.y < p.position.y + 1.7 && c.max.y > p.position.y + 0.5
+      && p.position.x > c.min.x - 0.65 && p.position.x < c.max.x + 0.65
+      && p.position.z > c.min.z - 0.65 && p.position.z < c.max.z + 0.65));
+    if (clear.length) candidates = clear;
+    const minimumDistance = kind === 'marksman' || kind === 'boss' ? 12 : kind === 'rusher' ? 10 : 9;
+    const separated = candidates.filter(p => p.position.distanceTo(this.player.body.position) >= minimumDistance
+      && living.every(e => e.position.distanceTo(p.position) > 2.6));
+    if (separated.length) candidates = separated;
+    const playerCenter = this.getPlayerCenter();
+    const forward = new THREE.Vector3(-Math.sin(this.player.yaw), 0, -Math.cos(this.player.yaw));
+    const preferredDistance = kind === 'marksman' ? 25 : kind === 'heavy' ? 16 : kind === 'boss' ? 20 : 18;
+    const scored = candidates.map((point, index) => {
+      const offset = point.position.clone().sub(this.player.body.position).setY(0);
+      const distance = offset.length();
+      const visible = this.queries.hasLineOfSight(playerCenter, point.position.clone().add(new THREE.Vector3(0, 1.35, 0)));
+      const inView = visible && offset.normalize().dot(forward) > 0.45;
+      const crowded = living.some(enemy => enemy.position.distanceTo(point.position) < 2.6);
+      // Elevated marksmen need an actual firing lane; an occluded perch merely delays pressure.
+      const exposurePenalty = kind === 'marksman' ? visible ? (inView ? 3 : 0) : 22 : inView ? 13 : 0;
+      return { point, score: Math.abs(distance - preferredDistance) + exposurePenalty
+        + (distance < minimumDistance ? 100 + (minimumDistance - distance) * 8 : 0)
+        + (crowded ? 40 : 0) + ((index + ordinal) % Math.max(1, candidates.length)) * 0.7 };
+    });
+    scored.sort((a, b) => a.score - b.score);
+    // Covered entries are preferred, but visible entries remain valid with the enemy's attack windup.
+    return scored[0]?.point.position.clone() ?? fallback;
+  }
+
   getSnapshot(): PublicGameSnapshot {
     const weapon = this.weapons.getSnapshot();
     return {
       mode: this.state.mode,
+      level: this.levelMode,
+      position: this.player.body.position.toArray(),
+      waveState: this.waves.state,
       score: this.state.score,
       wave: this.state.wave,
       enemies: this.enemies.livingCount,
@@ -350,6 +431,9 @@ export class Game {
     this.hud.startButton.removeEventListener('click', this.handleStartClick);
     this.hud.restartButton.removeEventListener('click', this.handleRestartClick);
     this.hud.saveCardButton.removeEventListener('click', this.handleSaveCardClick);
+    document.querySelector('#fold-mode-button')?.removeEventListener('click', this.handleFoldModeSwitch);
+    document.querySelector('#pages-mode-button')?.removeEventListener('click', this.handlePagesModeSwitch);
+    document.querySelector('#return-menu-button')?.removeEventListener('click', this.handleReturnMenu);
     this.overlay.removeEventListener('click', this.handleOverlayClick);
     for (const event of ['mousedown', 'touchstart', 'touchend', 'keydown']) {
       document.removeEventListener(event, this.handleAudioGesture, true);
@@ -387,6 +471,9 @@ export class Game {
     this.hud.startButton.addEventListener('click', this.handleStartClick);
     this.hud.restartButton.addEventListener('click', this.handleRestartClick);
     this.hud.saveCardButton.addEventListener('click', this.handleSaveCardClick);
+    document.querySelector('#fold-mode-button')?.addEventListener('click', this.handleFoldModeSwitch);
+    document.querySelector('#pages-mode-button')?.addEventListener('click', this.handlePagesModeSwitch);
+    document.querySelector('#return-menu-button')?.addEventListener('click', this.handleReturnMenu);
     this.overlay.addEventListener('click', this.handleOverlayClick);
     for (const event of ['mousedown', 'touchstart', 'touchend', 'keydown']) {
       document.addEventListener(event, this.handleAudioGesture, { capture: true, passive: true });
@@ -436,11 +523,50 @@ export class Game {
     this.camera.updateProjectionMatrix();
   };
 
-  private readonly handleStartClick = (event: MouseEvent): void => {
+  private enterLevel(event: Event, target: LevelMode): void {
     event.stopPropagation();
-    if (!this.roundStarted) this.beginRound();
+    if (this.state.mode !== 'start') return;
     this.audio.resume();
+    if (target !== this.levelMode) {
+      this.enemies.reset();
+      this.waves.reset();
+      this.effects.clear();
+      this.arena.dispose();
+      this.levelMode = target;
+      this.arena = new ArenaBuilder({ levelMode: target }).build();
+      this.scene.add(this.arena.root);
+      this.arena.syncColliderBounds();
+      this.physics.setColliders(this.arena.colliders);
+      this.player.safeSpawn.copy(this.arena.safePlayerSpawn);
+      this.queries = new ArenaQueries(this.arena);
+      this.supplies = new SupplySystem(this.arena, (supplyEvent) => this.handleSupply(supplyEvent));
+      this.summonPoints.splice(
+        0,
+        this.summonPoints.length,
+        ...this.arena.enemySpawnPoints.filter((point) => point.elevation === 'ground').map((point) => point.position),
+      );
+      this.waves = this.createWaveDirector();
+    }
+    this.hud.setLevelMode(target);
+    this.beginRound();
     this.requestGameplayControl();
+    this.renderHud();
+    try {
+      const url = new URL(window.location.href); url.searchParams.set('mode',target);
+      window.history.replaceState(null, '', url);
+    } catch { /* History is optional in embedded containers. */ }
+  }
+
+  private readonly handleStartClick = (event: MouseEvent): void => this.enterLevel(event, 'classic');
+  private readonly handleFoldModeSwitch = (event: Event): void => this.enterLevel(event, 'fold-foundry');
+  private readonly handlePagesModeSwitch = (event: Event): void => this.enterLevel(event, 'dual-pages');
+
+  private readonly handleReturnMenu = (event: Event): void => {
+    event.stopPropagation();
+    this.setMode('start');
+    this.enemies.reset();
+    this.waves.reset();
+    this.hud.clearDamageFeedback();
   };
 
   private readonly handleRestartClick = (event: MouseEvent): void => {
@@ -593,7 +719,6 @@ export class Game {
     this.demoSpawnSerial = 0;
     this.qaInkDemoConsumed = false;
     this.qaDamageDemoConsumed = false;
-    this.roundStarted = true;
     this.waves.start();
     this.hud.showTip('利用掩体交战 · 长刀可格挡并反弹来袭墨弹', 5.5);
     this.setMode('paused');
@@ -637,7 +762,6 @@ export class Game {
       this.controlRequest += 1;
       this.pointerLockRequested = false;
       this.input.setPointerFallback(false);
-      if (document.pointerLockElement === this.canvas) void document.exitPointerLock();
       this.setMode('paused');
       return;
     }
@@ -716,6 +840,8 @@ export class Game {
     this.waves.update(simulationDelta);
     if (this.state.mode === 'playing') this.enemies.update(simulationDelta);
     if (this.autoplay && this.state.mode === 'playing') this.updateAutoplay(simulationDelta);
+    this.arena.updateTactics?.(simulationDelta, [this.player.body.position, ...this.enemies.getLivingEnemies().map(e => e.position)]);
+    this.updateObjectiveHud();
     this.arena.update(simulationDelta);
     this.effects.update(simulationDelta);
     this.supplies.update(realDelta, this.player.body.position, this.state.mode === 'playing');
@@ -817,12 +943,24 @@ export class Game {
     }
 
     if (worldHit) {
+      if (worldHit.object.userData.pageSwitch) {
+        if (this.arena.activatePageSwitch?.()) { this.audio.play('worldImpact'); this.hud.showTip('红印触发 · 隔墙即将翻折', 1.4); }
+        this.effects.spawnBurst(worldHit.point, 'red', 0.25, 0.3);
+        return { hit: false, headshot: false, endpoint: worldHit.point.clone() };
+      }
       const breakableId = worldHit.object.userData.breakableId as string | undefined;
       if (breakableId) {
+        const interaction = worldHit.object.userData.breakableInteraction as string | undefined;
         const multiplier = weaponId === 'shotgun' ? 1.55 : weaponId === 'sniper' ? 1.3 : 1;
         const result = this.arena.damageBreakable(breakableId, damage * multiplier, worldHit.point, direction);
-        this.effects.spawnBurst(worldHit.point, 'orange', result?.destroyed ? 0.42 : 0.18, 0.28);
-        if (result?.destroyed) this.effects.spawnDebris(worldHit.point, direction, 'orange', 10);
+        const color = interaction === 'bridge-joint' ? 'red' : 'orange';
+        this.effects.spawnBurst(worldHit.point, color, result?.destroyed ? 0.42 : 0.18, 0.28);
+        if (result?.destroyed) {
+          this.effects.spawnDebris(worldHit.point, direction, color, 10);
+          if (interaction === 'bridge-joint') this.hud.showTip('连接点断裂 · 折纸桥坠落', 1.35);
+          else if (breakableId.startsWith('paper-wall-')) this.hud.showTip('纸墙已击穿 · 射击路线打开', 1.15);
+          else if (breakableId === 'ink-shutter') this.hud.showTip('墨闸已击穿 · 深处火线打开', 1.15);
+        }
       } else {
         this.effects.spawnBurst(worldHit.point, 'blue', 0.13, 0.34);
       }
@@ -875,7 +1013,7 @@ export class Game {
     if (result.count > 0) {
       this.audio.play('katana');
       this.effects.spawnBurst(request.origin, 'green', request.perfect ? 0.34 : 0.24, 0.2);
-      if (request.perfect) this.hud.showTip('PERFECT RETURN!', 0.8);
+      if (request.perfect) this.hud.showTip('完美反弹！', 0.8);
     }
   }
 
@@ -926,7 +1064,7 @@ export class Game {
       this.audio.play('block');
     } else if (effect.kind === 'block-break') {
       this.audio.play('hurt');
-      this.hud.showTip('BLOCK BROKEN', 1.1);
+      this.hud.showTip('格挡耗尽', 1.1);
     }
   }
 
@@ -934,14 +1072,14 @@ export class Game {
     if (this.state.mode !== 'playing') return;
     const weapon = this.weapons.getSnapshot();
     const blocked = weapon.activeWeapon === 'katana' && weapon.katana.blocking && event.projectileId !== undefined;
-    const mitigatedDamage = event.amount * (blocked ? 0.24 : 0.72);
+    const mitigatedDamage = event.amount * (blocked ? 0.24 : this.levelMode === 'classic' ? 0.72 : 1);
     const amount = this.capturePlayback ? 0 : mitigatedDamage;
     const dead = this.player.applyDamage(amount);
     this.audio.play('hurt');
     const incomingYaw = Math.atan2(event.direction.x, event.direction.z);
     const relative = Math.atan2(Math.sin(incomingYaw - this.player.yaw), Math.cos(incomingYaw - this.player.yaw));
     this.hud.flashDamage(relative, mitigatedDamage);
-    if (blocked) this.hud.showTip('BLOCKED', 0.55);
+    if (blocked) this.hud.showTip('已格挡', 0.55);
     if (dead) this.finish('defeat');
   }
 
@@ -1017,7 +1155,7 @@ export class Game {
     } else if (event.type === 'projectile-spawn') {
       this.audio.play('enemyFire');
     } else if (event.type === 'boss-phase') {
-      this.hud.showBanner('THE DOODLER', 'PHASE TWO · THE LINES GET ANGRY', 2.1);
+      this.hud.showBanner('涂鸦魔王', '第二阶段 · 狂暴落笔', 2.1);
       this.audio.play('boss');
     } else if (event.type === 'boss-summon') {
       this.hud.showTip('THE DOODLER SKETCHED REINFORCEMENTS', 2.1);
@@ -1048,6 +1186,25 @@ export class Game {
       this.audio.play('waveClear');
     } else if (event.type === 'victory') {
       this.finish('victory');
+    }
+  }
+
+  private updateObjectiveHud(): void {
+    const element = document.querySelector<HTMLElement>('#level-objective');
+    if (!element) return;
+    const objectives = this.arena.objectives;
+    element.hidden = this.levelMode === 'classic' || !objectives?.length;
+    if (element.hidden || !objectives) return;
+    const next = objectives.find(o => o.firstWave === this.waves.wave + 1);
+    if (this.waves.state === 'intermission' && next) {
+      const delta = next.position.clone().sub(this.player.body.position);
+      const distance = Math.round(delta.length());
+      const bearing = Math.atan2(-delta.x, -delta.z) - this.player.yaw;
+      const direction = Math.cos(bearing) > 0.6 ? '↑' : Math.cos(bearing) < -0.6 ? '↓' : Math.sin(bearing) > 0 ? '←' : '→';
+      element.textContent = `${direction} 前往${next.name} · ${distance} 米 · 靠近自动开战`;
+    } else {
+      const objective = objectives[Math.min(2, Math.floor((Math.max(1,this.waves.wave)-1)/2))];
+      element.textContent = objective ? `${objective.name} · ${objective.hint}` : '';
     }
   }
 
@@ -1401,9 +1558,10 @@ export class Game {
       scoped: weapon.scopeState === 'active' || weapon.scopeState === 'entering',
       reticleSpread,
       boss: enemies.bossHealth !== null && enemies.bossMaxHealth !== null
-        ? { name: 'THE DOODLER', health: enemies.bossHealth, maxHealth: enemies.bossMaxHealth }
+        ? { name: '涂鸦魔王', health: enemies.bossHealth, maxHealth: enemies.bossMaxHealth }
         : null,
       weapons: WEAPON_IDS.map((id) => ({
+        id,
         slot: WEAPON_DEFINITIONS[id].slot,
         name: WEAPON_DEFINITIONS[id].label,
         description: WEAPON_DEFINITIONS[id].hint,

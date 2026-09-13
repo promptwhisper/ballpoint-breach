@@ -5,6 +5,7 @@ import { InkDamageOverlay } from './InkDamageOverlay';
 export type OverlayMode = 'loading' | 'start' | 'playing' | 'paused' | 'defeat' | 'victory';
 
 export interface HudWeaponState {
+  id: string;
   slot: number;
   name: string;
   ammo: number;
@@ -74,6 +75,9 @@ export class Hud {
   private readonly damageIndicator: HTMLElement;
   private readonly scope: HTMLElement;
   private readonly inkDamage: InkDamageOverlay | null;
+  private readonly foldModeButton: HTMLButtonElement;
+  private readonly pagesModeButton: HTMLButtonElement;
+  private levelMode: 'classic' | 'fold-foundry' | 'dual-pages' = 'classic';
   private bannerTimer = 0;
   private tipTimer = 0;
   private hitTimer = 0;
@@ -118,17 +122,31 @@ export class Hud {
     this.hitMarker = required('#hit-marker');
     this.damageIndicator = required('#damage-indicator');
     this.scope = required('#scope-overlay');
+    this.foldModeButton = required<HTMLButtonElement>('#fold-mode-button');
+    this.pagesModeButton = required<HTMLButtonElement>('#pages-mode-button');
     this.inkDamage = this.inkStyle ? new InkDamageOverlay(root) : null;
     root.querySelectorAll<HTMLElement>('[data-weapon-slot]').forEach(row => {
       this.weaponRows.set(Number(row.dataset.weaponSlot), { row, ammo: row.querySelector('[data-weapon-ammo]') });
     });
   }
 
+  setLevelMode(mode: 'classic' | 'fold-foundry' | 'dual-pages'): void {
+    this.levelMode = mode;
+    this.root.body.dataset.levelMode = mode;
+  }
+
   setMode(mode: OverlayMode): void {
     this.overlay.dataset.mode = mode;
+    this.root.body.dataset.gameMode = mode;
+    const choices = this.root.querySelector<HTMLElement>('#level-choices');
+    if (choices) choices.hidden = mode !== 'start';
+    const menu = this.root.querySelector<HTMLButtonElement>('#return-menu-button');
+    if (menu) menu.hidden = mode !== 'paused' && mode !== 'defeat' && mode !== 'victory';
     const visible = mode !== 'playing';
     this.overlay.classList.toggle('visible', visible);
     this.startButton.hidden = mode !== 'start' && mode !== 'loading';
+    this.foldModeButton.hidden = mode !== 'start';
+    this.pagesModeButton.hidden = mode !== 'start';
     this.restartButton.hidden = mode !== 'defeat' && mode !== 'victory';
     this.saveCardButton.hidden = !this.inkStyle || (mode !== 'defeat' && mode !== 'victory');
     this.root.body.dataset.gameMode = mode;
@@ -136,16 +154,15 @@ export class Hud {
     if (this.inkStyle) {
       const copy = {
         loading: ['入墨', '墨境将启', '正在铺纸研墨，请稍候。'],
-        start: ['破阵', '一纸墨境 · 十阵来敌', '执枪入画，守住此地。击退十阵来敌，迎战墨魁。'],
+        start: ['择卷', '三卷墨境 · 各有杀局', '选择一卷入画：守阵、突围，或攻入机枢。'],
         paused: ['暂歇', '战局已暂停', '轻触画面继续'],
         defeat: ['落墨', '此战未竟', '整顿行装，再入墨境。'],
-        victory: ['破阵', '十阵尽破 · 墨魁已伏', '这一纸战局，由你写下终章。'],
+        victory: ['破阵', this.levelMode === 'classic' ? '十阵尽破 · 墨魁已伏' : '六战皆捷 · 此卷已破', '这一纸战局，由你写下终章。'],
         playing: ['', '', ''],
       }[mode];
       this.overlayInkTitle.textContent = copy[0];
       this.overlayTitle.textContent = copy[1];
       this.overlayCopy.textContent = copy[2];
-      this.startButton.textContent = mode === 'loading' ? '正在入墨…' : '入 境';
       this.startButton.disabled = mode === 'loading';
       this.restartButton.textContent = mode === 'victory' ? '再战一局' : '重新入阵';
       return;
@@ -208,6 +225,8 @@ export class Hud {
       this.setText(this.weaponDescription, this.inkStyle ? WEAPON_COPY[current.name]?.hint ?? current.description : current.description);
       if (this.root.body.dataset.reticle !== current.name.toLowerCase()) this.root.body.dataset.reticle = current.name.toLowerCase();
     }
+    const visibleSlots = new Set(snapshot.weapons.map((weapon) => weapon.slot));
+    for (const [slot, cached] of this.weaponRows) cached.row.hidden = !visibleSlots.has(slot);
     for (const weapon of snapshot.weapons) {
       const cached = this.weaponRows.get(weapon.slot);
       if (!cached) continue;
