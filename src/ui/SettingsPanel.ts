@@ -6,7 +6,7 @@ export function normalizeSettings(value: unknown): PlayerSettings {
   const raw = value && typeof value === 'object' ? value as Partial<PlayerSettings> : {};
   return {
     sensitivity: typeof raw.sensitivity === 'number' && Number.isFinite(raw.sensitivity)
-      ? Math.max(0.5, Math.min(4, raw.sensitivity)) : 1.8,
+      ? Math.max(0.5, Math.min(4, raw.sensitivity)) : 3,
     fireMode: raw.fireMode === 'button' ? 'button' : 'screen',
     soundEnabled: raw.soundEnabled !== false,
   };

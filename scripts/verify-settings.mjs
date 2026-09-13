@@ -27,7 +27,7 @@ try {
     await page.locator('#settings-toggle').tap();
     assert.equal(await mode(),'paused');
     const pausedAmmo=await ammo();
-    assert.equal(await page.locator('#sensitivity-value').textContent(),'1.8 倍');
+    assert.equal(await page.locator('#sensitivity-value').textContent(),'3.0 倍');
     const sliderBox=await page.locator('#look-sensitivity').boundingBox();
     const touchSession=await context.newCDPSession(page);
     const trackPoint=fraction=>width>height

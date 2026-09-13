@@ -123,7 +123,7 @@ export class InputManager {
   private touchLookCanFire = false;
   private touchLookFiring = false;
   private touchFireTimer: number | null = null;
-  private touchSensitivity = 1.8;
+  private touchSensitivity = 3;
   private fireMode: 'screen' | 'button' = 'screen';
   private buttonFireId: number | null = null;
   private joystickTouchId: number | null = null;
@@ -191,7 +191,7 @@ export class InputManager {
 
   setTouchSettings(sensitivity: number, fireMode: 'screen' | 'button'): void {
     this.clearHeld();
-    this.touchSensitivity = Number.isFinite(sensitivity) ? Math.max(0.5, Math.min(4, sensitivity)) : 1.8;
+    this.touchSensitivity = Number.isFinite(sensitivity) ? Math.max(0.5, Math.min(4, sensitivity)) : 3;
     this.fireMode = fireMode;
   }
 
