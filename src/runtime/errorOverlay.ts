@@ -1,1 +1,12 @@
-export function installErrorOverlay():void{window.addEventListener('error',event=>{const stage=document.querySelector<HTMLElement>('#stage');if(stage){stage.textContent=`RUNTIME ERROR · ${event.message}`;stage.style.background='#640b16';stage.style.color='white';return;}const panel=document.createElement('pre');panel.textContent=`Runtime error: ${event.message}`;Object.assign(panel.style,{position:'fixed',inset:'0 0 auto 0',background:'#640b16',color:'white',padding:'12px',zIndex:'99'});document.body.append(panel);});}
+export function installErrorOverlay(): void {
+  window.addEventListener('error', (event) => {
+    console.error('Game runtime error:', event.error ?? event.message);
+    if (document.querySelector('#runtime-error')) return;
+    const panel = document.createElement('div');
+    panel.id = 'runtime-error';
+    panel.setAttribute('role', 'alert');
+    panel.textContent = '战场遇到了一点问题，请退出后重新打开。';
+    Object.assign(panel.style, { position: 'fixed', inset: '0 0 auto 0', background: '#640b16', color: 'white', padding: '12px', zIndex: '99' });
+    document.body.append(panel);
+  });
+}

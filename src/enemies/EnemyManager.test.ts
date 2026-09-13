@@ -3,11 +3,69 @@ import test from 'node:test';
 import * as THREE from 'three';
 import { DoodleMaterial } from '../render';
 import { EnemyManager } from './EnemyManager';
-import type { EnemyEvent, PlayerDamageEvent } from './types';
+import type { EnemyCombatProfile, EnemyEvent, PlayerDamageEvent } from './types';
 
 function updateFor(manager: EnemyManager, seconds: number, step = 0.05): void {
   for (let elapsed = 0; elapsed < seconds; elapsed += step) manager.update(step);
 }
+
+test('challenge riflemen contest a 24 metre lane without increasing their health', () => {
+  for (const profile of ['classic', 'assault', 'siege'] as const) {
+    const events: EnemyEvent[] = [];
+    const manager = new EnemyManager(new THREE.Group(), {
+      seed: 42,
+      getPlayer: () => ({ position: new THREE.Vector3(0, 1, 24), radius: 0.48 }),
+      getCombatProfile: () => profile,
+      onEvent: event => events.push(event),
+    });
+    const enemy = manager.spawn('grunt', new THREE.Vector3());
+    updateFor(manager, 2);
+    assert.equal(enemy.maxHealth, 90, 'difficulty must not inflate time to kill');
+    const fired = events.some(event => event.type === 'projectile-spawn');
+    assert.equal(fired, profile !== 'classic', `${profile} should have its own effective range`);
+    manager.reset();
+  }
+});
+
+test('changing maps restores the classic combat profile on subsequent spawns', () => {
+  let profile: EnemyCombatProfile = 'assault';
+  const manager = new EnemyManager(new THREE.Group(), {
+    seed: 42,
+    getPlayer: () => ({ position: new THREE.Vector3(0, 1, 40) }),
+    hasLineOfSight: () => false,
+    getCombatProfile: () => profile,
+  });
+  const distances: number[] = [];
+  for (const next of ['assault', 'siege', 'classic'] as const) {
+    profile = next;
+    manager.reset();
+    const enemy = manager.spawn('rusher', new THREE.Vector3());
+    updateFor(manager, 1.5);
+    assert.equal(enemy.combatProfile, next);
+    assert.equal(enemy.maxHealth, 58);
+    distances.push(enemy.position.z);
+  }
+  assert.ok(distances[1]! > distances[0]! && distances[0]! > distances[2]! * 1.4);
+  manager.reset();
+});
+
+test('challenge bosses navigate to an obstructed player before starting an attack', () => {
+  const events: EnemyEvent[] = [];
+  let navigationCalls = 0;
+  const manager = new EnemyManager(new THREE.Group(), {
+    getPlayer: () => ({ position: new THREE.Vector3(0, 1, 18) }),
+    getCombatProfile: () => 'siege',
+    hasLineOfSight: () => false,
+    navigationTarget: () => { navigationCalls += 1; return new THREE.Vector3(5, 0, 6); },
+    onEvent: event => events.push(event),
+  });
+  const boss = manager.spawn('boss', new THREE.Vector3());
+  updateFor(manager, 2);
+  assert.ok(navigationCalls > 0);
+  assert.ok(boss.position.x > 0.5, 'boss should follow the side passage');
+  assert.equal(events.some(event => event.type === 'attack-telegraph'), false);
+  manager.reset();
+});
 
 test('grunt progresses through its FSM, attacks, and damages the player', () => {
   const scene = new THREE.Group();

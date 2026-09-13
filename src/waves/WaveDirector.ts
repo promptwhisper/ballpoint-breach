@@ -12,21 +12,21 @@ import type {
 export const DEFAULT_WAVES: readonly WaveDefinition[] = [
   {
     number: 1,
-    subtitle: 'FIRST MARKS ON THE PAGE',
+    subtitle: '落笔交锋',
     composition: [{ kind: 'grunt', count: 4 }, { kind: 'rusher', count: 2 }],
     spawnInterval: 0.72,
     maxConcurrent: 6,
   },
   {
     number: 2,
-    subtitle: 'THE INK FIGHTS BACK',
+    subtitle: '墨迹反扑',
     composition: [{ kind: 'grunt', count: 5 }, { kind: 'rusher', count: 3 }, { kind: 'marksman', count: 1 }],
     spawnInterval: 0.62,
     maxConcurrent: 9,
   },
   {
     number: 3,
-    subtitle: 'NO CLEAN MARGINS',
+    subtitle: '边角失守',
     composition: [
       { kind: 'grunt', count: 5 },
       { kind: 'rusher', count: 4 },
@@ -38,7 +38,7 @@ export const DEFAULT_WAVES: readonly WaveDefinition[] = [
   },
   {
     number: 4,
-    subtitle: 'CROSS OUT EVERYTHING',
+    subtitle: '火线涂满整页',
     composition: [
       { kind: 'grunt', count: 6 },
       { kind: 'rusher', count: 5 },
@@ -50,7 +50,7 @@ export const DEFAULT_WAVES: readonly WaveDefinition[] = [
   },
   {
     number: 5,
-    subtitle: 'THE DOODLER IS COMING',
+    subtitle: '涂鸦魔王来袭',
     composition: [
       { kind: 'boss', count: 1 },
       { kind: 'grunt', count: 4 },
@@ -61,21 +61,39 @@ export const DEFAULT_WAVES: readonly WaveDefinition[] = [
     spawnInterval: 0.5,
     maxConcurrent: 15,
   },
-  { number: 6, subtitle: 'SECOND DRAFT',
+  { number: 6, subtitle: '翻页再战',
     composition: [{kind:'grunt',count:8},{kind:'rusher',count:7},{kind:'heavy',count:3},{kind:'marksman',count:2}],
     spawnInterval: .48, maxConcurrent: 12 },
-  { number: 7, subtitle: 'CROSSFIRE IN THE MARGINS',
+  { number: 7, subtitle: '页边交叉火力',
     composition: [{kind:'marksman',count:5},{kind:'grunt',count:7},{kind:'rusher',count:7},{kind:'heavy',count:4}],
     spawnInterval: .45, maxConcurrent: 13 },
-  { number: 8, subtitle: 'HEAVY INK',
+  { number: 8, subtitle: '重墨压境',
     composition: [{kind:'heavy',count:6},{kind:'rusher',count:8},{kind:'grunt',count:8},{kind:'marksman',count:4}],
     spawnInterval: .42, maxConcurrent: 14 },
-  { number: 9, subtitle: 'NO ROOM TO BREATHE',
+  { number: 9, subtitle: '步步紧逼',
     composition: [{kind:'rusher',count:11},{kind:'grunt',count:8},{kind:'heavy',count:6},{kind:'marksman',count:4}],
     spawnInterval: .4, maxConcurrent: 15 },
-  { number: 10, subtitle: 'THE FINAL DOODLE',
+  { number: 10, subtitle: '最后一笔',
     composition: [{kind:'boss',count:1},{kind:'heavy',count:7},{kind:'marksman',count:6},{kind:'rusher',count:10},{kind:'grunt',count:8}],
     spawnInterval: .44, maxConcurrent: 16 },
+];
+
+export const FOLD_FOUNDRY_WAVES: readonly WaveDefinition[] = [
+  { number: 1, subtitle: '卸货入口 · 清除哨位', composition: [{kind:'grunt',count:6},{kind:'marksman',count:2},{kind:'rusher',count:4}], spawnInterval:0.44, maxConcurrent:10 },
+  { number: 2, subtitle: '货箱通道 · 侧翼增援', composition: [{kind:'grunt',count:7},{kind:'marksman',count:3},{kind:'rusher',count:4},{kind:'heavy',count:2}], spawnInterval:0.42, maxConcurrent:11 },
+  { number: 3, subtitle: '转运仓库 · 高低夹击', composition: [{kind:'marksman',count:4},{kind:'grunt',count:8},{kind:'rusher',count:4},{kind:'heavy',count:2}], spawnInterval:0.4, maxConcurrent:12 },
+  { number: 4, subtitle: '仓库反扑 · 守住侧路', composition: [{kind:'grunt',count:8},{kind:'rusher',count:6},{kind:'marksman',count:3},{kind:'heavy',count:3}], spawnInterval:0.38, maxConcurrent:12 },
+  { number: 5, subtitle: '调度楼前 · 压制窗口', composition: [{kind:'marksman',count:5},{kind:'grunt',count:8},{kind:'rusher',count:6},{kind:'heavy',count:3}], spawnInterval:0.36, maxConcurrent:13 },
+  { number: 6, subtitle: '货站突围 · 最后一班', composition: [{kind:'boss',count:1},{kind:'grunt',count:8},{kind:'marksman',count:4},{kind:'rusher',count:7},{kind:'heavy',count:4}], spawnInterval:0.36, maxConcurrent:14 },
+];
+
+export const DUAL_PAGES_WAVES: readonly WaveDefinition[] = [
+  { number: 1, subtitle: '机房入口 · 迎击追兵', composition: [{kind:'rusher',count:5},{kind:'grunt',count:5},{kind:'heavy',count:1},{kind:'marksman',count:1}], spawnInterval:0.44, maxConcurrent:10 },
+  { number: 2, subtitle: '维修环道 · 交替换位', composition: [{kind:'rusher',count:7},{kind:'grunt',count:5},{kind:'heavy',count:2},{kind:'marksman',count:2}], spawnInterval:0.42, maxConcurrent:11 },
+  { number: 3, subtitle: '发电机组 · 两翼追猎', composition: [{kind:'rusher',count:8},{kind:'heavy',count:3},{kind:'grunt',count:5},{kind:'marksman',count:2}], spawnInterval:0.4, maxConcurrent:12 },
+  { number: 4, subtitle: '上层走廊 · 重装压境', composition: [{kind:'heavy',count:4},{kind:'rusher',count:8},{kind:'grunt',count:6},{kind:'marksman',count:2}], spawnInterval:0.38, maxConcurrent:12 },
+  { number: 5, subtitle: '控制台前 · 环道合围', composition: [{kind:'rusher',count:9},{kind:'heavy',count:4},{kind:'marksman',count:3},{kind:'grunt',count:6}], spawnInterval:0.36, maxConcurrent:13 },
+  { number: 6, subtitle: '机房围攻 · 全力突围', composition: [{kind:'boss',count:1},{kind:'rusher',count:10},{kind:'heavy',count:4},{kind:'marksman',count:3},{kind:'grunt',count:6}], spawnInterval:0.36, maxConcurrent:14 },
 ];
 
 function createRandom(seed: number): () => number {
@@ -161,6 +179,8 @@ export class WaveDirector {
     }
 
     if (this.currentState === 'intermission' && this.stateTime >= (this.options.intermissionDuration ?? 4.25)) {
+      const next = this.definitions[this.waveIndex + 1];
+      if (next && this.options.canAdvanceToWave?.(next.number) === false) return;
       this.waveIndex += 1;
       this.enterAnnouncement();
     }
@@ -253,6 +273,17 @@ export class WaveDirector {
     const definition = this.currentDefinition;
     if (!definition) return;
     this.queuedKinds = definition.composition.flatMap((group) => Array.from({ length: group.count }, () => group.kind));
+    if (this.options.interleaveKinds) {
+      const squads = definition.composition.map(group => ({ ...group }));
+      this.queuedKinds = [];
+      while (squads.some(group => group.count > 0)) {
+        for (const group of squads) {
+          if (group.count <= 0) continue;
+          this.queuedKinds.push(group.kind);
+          group.count -= 1;
+        }
+      }
+    }
     this.currentState = 'spawning';
     this.stateTime = 0;
     this.spawnTimer = 0;
@@ -295,7 +326,7 @@ export class WaveDirector {
     if (!definition) return;
     this.trackedEnemyIds.clear();
     this.emit('wave-clear');
-    this.options.onRecovery?.({ wave: definition.number, healthFraction: 0.16, ammoFraction: 0.32 });
+    this.options.onRecovery?.({ wave: definition.number, healthFraction: 0.16, ammoFraction: 0.32, ...this.options.recovery });
     if (this.waveIndex >= this.definitions.length - 1) {
       this.currentState = 'victory';
       this.stateTime = 0;

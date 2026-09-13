@@ -12,6 +12,7 @@ try {
     const errors=[];
     page.on('pageerror',e=>errors.push(e.message));
     await page.goto('http://127.0.0.1:8912/');
+    assert.equal(await page.locator('[data-touch-action="grapple"], .grapple-meter').count(),0);
     const mode = () => page.evaluate(()=>window.__SCRIBBLE_SIEGE__.snapshot().mode);
     const ammo = async () => Number(await page.locator('[data-hud="ammo"]').textContent());
     await page.locator('#start-button').tap();

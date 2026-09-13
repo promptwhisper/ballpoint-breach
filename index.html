@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>BALLPOINT BREACH</title>
+    <title>纸上战场</title>
   </head>
   <body>
     <main id="landscape-shell">
@@ -11,35 +11,35 @@
     <div id="paper-lines" aria-hidden="true"></div>
     <div id="vignette" aria-hidden="true"></div>
 
-    <section id="hud" aria-label="Game status">
-      <div class="hud-score">SCORE <strong data-hud="score">0</strong></div>
-      <div class="hud-wave"><strong data-hud="wave">WAVE 1</strong><small data-hud="enemies">0 enemies left</small></div>
+    <section id="hud" aria-label="战局信息">
+      <div class="hud-score">得分 <strong data-hud="score">0</strong></div>
+      <div class="hud-wave"><strong data-hud="wave">第 1 波</strong><small data-hud="enemies">剩余 0 名敌人</small></div>
 
       <div id="boss-health">
-        <strong data-hud="boss-name">THE DOODLER</strong>
+        <strong data-hud="boss-name">涂鸦魔王</strong>
         <i data-hud="boss-bar"></i>
       </div>
 
-      <div class="hud-health"><span>HP</span><i data-hud="health-bar"></i><b data-hud="health">100</b></div>
+      <div class="hud-health"><span>生命</span><i data-hud="health-bar"></i><b data-hud="health">100</b></div>
       <div class="hud-ammo"><strong data-hud="ammo">30</strong><span data-hud="reserve">/150</span><div class="ammo-ticks">//// //// //// //// //</div></div>
 
       <div class="hud-weapons">
         <ol>
-          <li data-weapon-slot="1" class="selected"><span>RIFLE</span><em data-weapon-ammo>30/150</em></li>
-          <li data-weapon-slot="2"><span>SHOTGUN</span><em data-weapon-ammo>6/30</em></li>
-          <li data-weapon-slot="3"><span>REVOLVER</span><em data-weapon-ammo>6/36</em></li>
-          <li data-weapon-slot="4"><span>SNIPER</span><em data-weapon-ammo>5/25</em></li>
-          <li data-weapon-slot="5"><span>KATANA</span><em data-weapon-ammo>∞</em></li>
+          <li data-weapon-slot="1" class="selected"><span>自动步枪</span><em data-weapon-ammo>30/150</em></li>
+          <li data-weapon-slot="2"><span>霰弹枪</span><em data-weapon-ammo>6/30</em></li>
+          <li data-weapon-slot="3"><span>左轮手枪</span><em data-weapon-ammo>6/36</em></li>
+          <li data-weapon-slot="4"><span>狙击步枪</span><em data-weapon-ammo>5/25</em></li>
+          <li data-weapon-slot="5"><span>武士刀</span><em data-weapon-ammo>∞</em></li>
         </ol>
-        <strong data-hud="weapon-name">RIFLE</strong>
-        <small data-hud="weapon-description">auto · aim for the holo sight</small>
+        <strong data-hud="weapon-name">自动步枪</strong>
+        <small data-hud="weapon-description">自动连射 · 开镜精准射击</small>
       </div>
 
-      <div class="ability-meter grapple-meter"><span>Q · GRAPPLE</span><i data-hud="grapple-bar"></i></div>
-      <div id="block-stamina" class="ability-meter"><span>BLOCK</span><i data-hud="block-bar"></i></div>
+      <div id="block-stamina" class="ability-meter"><span>格挡</span><i data-hud="block-bar"></i></div>
 
-      <div id="context-tip">grapple an enemy to yank them off a ledge</div>
-      <div id="wave-banner"><strong id="wave-banner-title">WAVE 1</strong><span id="wave-banner-subtitle">THE INK IS STILL WET</span></div>
+      <div id="level-objective" hidden></div>
+      <div id="context-tip">滑动转向 · 点击右侧射击</div>
+      <div id="wave-banner"><strong id="wave-banner-title">第 1 波</strong><span id="wave-banner-subtitle">墨迹未干，战局已开</span></div>
       <div class="crosshair"><i></i><i></i><i></i><i></i></div>
       <div id="hit-marker"><i></i><i></i><i></i><i></i></div>
       <div id="damage-indicator"></div>
@@ -63,35 +63,55 @@
         <p class="settings-help">设置自动保存 · 调整期间暂停战局</p>
       </div>
     </section>
-    <section id="touch-controls" aria-label="Touch controls">
+    <section id="touch-controls" aria-label="触屏操作">
       <button class="action-fire" type="button" data-touch-action="fire" aria-label="射击"><span>◎</span><small>射击</small></button>
-      <div class="touch-move" data-touch-joystick role="button" aria-label="Movement joystick">
+      <div class="touch-move" data-touch-joystick role="button" aria-label="移动摇杆">
         <i class="touch-stick" aria-hidden="true"></i>
       </div>
-      <div class="touch-actions" aria-label="Actions">
-        <button class="action-grapple" type="button" data-touch-action="grapple" aria-label="Grapple"><span>⌁</span><small>HOOK</small></button>
-        <button class="action-jump" type="button" data-touch-action="jump" aria-label="Jump"><span>↥</span><small>JUMP</small></button>
-        <button class="action-weapon" type="button" data-touch-action="weapon" aria-label="Switch weapon"><span>↻</span><small>SWAP</small></button>
-        <button class="action-aim" type="button" data-touch-action="aim" aria-label="Aim down sights"><span>⌾</span><small>ADS</small></button>
+      <div class="touch-actions" aria-label="战斗操作">
+        <button class="action-jump" type="button" data-touch-action="jump" aria-label="跳跃"><span>↥</span><small>跳跃</small></button>
+        <button class="action-weapon" type="button" data-touch-action="weapon" aria-label="切换武器"><span>↻</span><small>换枪</small></button>
+        <button class="action-aim" type="button" data-touch-action="aim" aria-label="开镜瞄准"><span>⌾</span><small>瞄准</small></button>
       </div>
     </section>
 
     <section id="game-overlay" class="visible" data-mode="loading">
       <div class="overlay-card">
-        <p class="eyebrow">A BALLPOINT-PEN ARENA FPS</p>
-        <h1 id="overlay-title">BALLPOINT<br>BREACH</h1>
-        <p id="overlay-copy">sharpening pencils…</p>
-        <button id="start-button" type="button" disabled>CLICK / TAP TO ENTER THE PAGE</button>
-        <button id="restart-button" type="button" hidden>DRAW AGAIN</button>
+        <p class="eyebrow">圆珠笔涂鸦射击</p>
+        <h1 id="overlay-title">纸上战场</h1>
+        <p id="overlay-copy">正在铺开战场…</p>
+        <div id="level-choices" aria-label="选择关卡，点击直接开战">
+          <button id="start-button" class="level-card" type="button" disabled aria-label="经典生存">
+            <span class="level-number">01 / 生存</span>
+            <svg viewBox="0 0 180 85" aria-hidden="true"><path d="M12 70h156M25 69V18h64v51M25 34h64M25 51h64M25 18l64 51M89 18L25 69M111 69V42h40v27M108 42l24-14 25 14M49 18V8h89v6M132 14v26"/><path class="accent" d="M98 11h52M137 15v14M112 47h10v11h-10M138 47h9v11h-9"/></svg>
+            <strong>经典生存</strong><small>建筑工地 · 自由走位</small><span class="level-meta">10 波生存 / 点击开战 ↗</span>
+          </button>
+          <button id="fold-mode-button" class="level-card" type="button" aria-label="货站突围">
+            <span class="level-number">02 / 突围</span>
+            <svg viewBox="0 0 180 85" aria-hidden="true"><path d="M8 71h164M10 77h95M22 58V29h73v29ZM20 26h78M28 32v23M35 32v23M82 32v23M89 32v23M30 58v8h14v-8M73 58v8h14v-8M107 69V27l29-17 31 17v42M106 28h62M115 68V43h17v25M141 68V43h17v25M136 11v18"/><path class="accent" d="M46 30h25v27H46ZM59 33v21M108 34h58M117 24h38"/></svg>
+            <strong>货站突围</strong><small>车厢清角 · 双门突入 · 调度楼攻坚</small><span class="level-meta">3 战区 · 6 场交战 / 点击开战 ↗</span>
+          </button>
+          <button id="pages-mode-button" class="level-card" type="button" aria-label="机房围攻">
+            <span class="level-number">03 / 交叉火线</span>
+            <svg viewBox="0 0 180 85" aria-hidden="true"><path d="M10 72h160M16 58V24h42M122 24h42v34M16 34h42M122 34h42M24 24v10M42 24v10M139 24v10M157 24v10M16 62l32-22M23 66l32-22M22 59h13M31 52h13M41 45h13M164 62l-32-22M157 66l-32-22M158 59h-13M149 52h-13M139 45h-13M65 24c0-9 50-9 50 0v36c0 10-50 10-50 0ZM65 24c0 9 50 9 50 0M84 17V6h12v11M96 10h47v13"/><path class="accent" d="M65 34c0 9 50 9 50 0M65 49c0 9 50 9 50 0M61 66h58M16 38h42M122 38h42"/></svg>
+            <strong>机房围攻</strong><small>机房环线 · 高台压制 · 侧翼追击</small><span class="level-meta">3 战区 · 6 场交战 / 点击开战 ↗</span>
+          </button>
+        </div>
+        <div class="overlay-actions">
+          <button id="save-card-button" type="button" hidden>保存战报</button>
+          <button id="restart-button" type="button" hidden>再战本关</button>
+          <button id="return-menu-button" type="button" hidden>返回开始页</button>
+        </div>
+        <p id="share-status" class="share-status" role="status" aria-live="polite" hidden></p>
         <div class="controls-grid">
-          <span><b>WASD</b> MOVE</span><span><b>SHIFT</b> SPRINT</span><span><b>SPACE</b> JUMP</span>
-          <span><b>1–5</b> WEAPONS</span><span><b>R</b> RELOAD</span><span><b>Q</b> GRAPPLE</span>
-          <span><b>LMB</b> ATTACK</span><span><b>RMB</b> AIM / BLOCK</span><span><b>ESC</b> PAUSE</span>
+          <span><b>WASD</b> 移动</span><span><b>SHIFT</b> 冲刺</span><span><b>空格</b> 跳跃</span>
+          <span><b>1–5</b> 切换武器</span><span><b>R</b> 换弹</span>
+          <span><b>鼠标左键</b> 射击</span><span><b>鼠标右键</b> 瞄准 / 格挡</span><span><b>ESC</b> 暂停</span>
         </div>
       </div>
     </section>
 
-    <div id="stage" role="status">BUILD STAGE · PLAYABLE CORE</div>
+    <div id="stage" role="status">战场准备中</div>
     </main>
     <script type="module" src="./src/main.ts"></script>
   </body>

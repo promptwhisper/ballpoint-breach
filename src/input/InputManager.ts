@@ -260,7 +260,6 @@ export class InputManager {
     if (event.repeat) return;
     if (event.code === 'Space') this.jumpPressed = true;
     if (event.code === 'KeyR') this.reloadPressed = true;
-    if (event.code === 'KeyQ') this.grapplePressed = true;
     if (event.code === 'Enter') this.restartPressed = true;
     if (event.code === 'Escape') this.pausePressed = true;
     if (/^Digit[1-5]$/.test(event.code)) this.weaponSelection = Number(event.code.charAt(event.code.length - 1));
@@ -430,7 +429,6 @@ export class InputManager {
     if (action === 'left') this.keys.add('KeyA');
     if (action === 'right') this.keys.add('KeyD');
     if (action === 'jump') this.jumpPressed = true;
-    if (action === 'grapple') this.grapplePressed = true;
     if (action === 'weapon') this.weaponWheel = 1;
     if (action === 'aim') {
       this.secondary = !this.secondary;

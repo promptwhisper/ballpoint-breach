@@ -29,3 +29,12 @@ license links, and modifications. The offline package also includes
 
 Mini-tool builds include these same sample bytes as Base64 in `audio-data.js`
 instead of MP3 files. Encoding does not change asset ownership or licensing.
+
+## Chinese handwritten UI fonts
+
+The embedded Ballpoint Marker and Ballpoint Hand fonts are renamed WOFF2 subsets
+of MaokenAssortedSans (ZERO and Umihotaru) and Yozai Medium (LXGW and Y.Oz).
+Both are licensed under SIL OFL 1.1, independently of the code license. Full
+copyright and license texts are preserved in `src/assets/fonts/licenses.json`
+and in production builds at `fonts/licenses.json`. See `docs/UI_FONTS.md` for
+upstream sources, subset regeneration and offline coverage verification.

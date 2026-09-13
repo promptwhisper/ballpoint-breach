@@ -4,6 +4,8 @@ export type EnemyKind = 'grunt' | 'rusher' | 'heavy' | 'marksman' | 'boss';
 
 export type RegularEnemyKind = Exclude<EnemyKind, 'boss'>;
 
+export type EnemyCombatProfile = 'classic' | 'assault' | 'siege';
+
 export type EnemyState = 'idle' | 'seek' | 'strafe' | 'attack' | 'stagger' | 'dead';
 
 export type EnemyHitZone = 'head' | 'torso' | 'limb';
@@ -142,12 +144,14 @@ export interface EnemyManagerOptions extends EnemyManagerCallbacks {
   despawnDelay?: number;
   maxEnemies?: number;
   bossSummonPoints?: readonly THREE.Vector3[];
+  getCombatProfile?: () => EnemyCombatProfile;
 }
 
 export interface EnemySpawnOptions {
   id?: string;
   yaw?: number;
   healthScale?: number;
+  combatProfile?: EnemyCombatProfile;
 }
 
 export interface ProjectileReflectionResult {

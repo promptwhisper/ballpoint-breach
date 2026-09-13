@@ -1,8 +1,26 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
-import { DEFAULT_WAVES, WaveDirector } from './WaveDirector';
+import { DEFAULT_WAVES, DUAL_PAGES_WAVES, FOLD_FOUNDRY_WAVES, WaveDirector } from './WaveDirector';
 import type { WaveEvent, WaveSpawnPoint } from './types';
+
+test('a cleared encounter waits for player progression without a confirmation and resumes automatically', () => {
+  let reached = false;
+  const director = new WaveDirector({
+    spawnPoints: makeSpawnPoints(), spawnEnemy: () => undefined, getActiveEnemyCount: () => 0,
+    definitions: [1,2].map(number => ({number,subtitle:'route',composition:[{kind:number === 2 ? 'boss' as const : 'grunt' as const,count:1}],spawnInterval:0.05,maxConcurrent:1})),
+    announcementDuration:0.05, intermissionDuration:0.05,
+    canAdvanceToWave: wave => wave !== 2 || reached,
+  });
+  director.start();
+  for(let i=0;i<60;i++)director.update(0.1);
+  assert.equal(director.wave,1);
+  assert.equal(director.state,'intermission');
+  reached = true;
+  director.update(0.1);
+  assert.equal(director.wave,2);
+  assert.equal(director.state,'announcement');
+});
 
 function makeSpawnPoints(): WaveSpawnPoint[] {
   return Array.from({ length: 12 }, (_, index) => ({
@@ -107,5 +125,42 @@ test('late waves queue reinforcements instead of exceeding their concurrent budg
     for(let tick=0;tick<4;tick++) director.update(.25);
     assert.equal(active,wave.maxConcurrent);
     assert.equal(total,wave.maxConcurrent+1);
+  }
+});
+
+test('challenge opening squads mix threats immediately and queue reinforcements within the mobile budget', () => {
+  for (const definitions of [FOLD_FOUNDRY_WAVES, DUAL_PAGES_WAVES]) {
+    const kinds: string[] = [];
+    let active = 0;
+    const director = new WaveDirector({
+      spawnPoints: makeSpawnPoints(), definitions, interleaveKinds: true, announcementDuration: 0,
+      getActiveEnemyCount: () => active,
+      spawnEnemy: kind => { kinds.push(kind); active += 1; },
+    });
+    director.start();
+    for (let tick = 0; tick < 100; tick += 1) director.update(0.25);
+    assert.equal(new Set(kinds.slice(0, 3)).size, 3, 'three complementary roles should arrive together');
+    assert.equal(active, definitions[0]!.maxConcurrent);
+    assert.ok(director.getSnapshot().queued > 0);
+    assert.ok(definitions.every(wave => wave.maxConcurrent <= 14));
+    active -= 1;
+    for (let tick = 0; tick < 3; tick += 1) director.update(0.25);
+    assert.equal(active, definitions[0]!.maxConcurrent, 'reinforcements should refill a cleared slot');
+  }
+});
+
+test('challenge recovery is configurable while classic recovery remains unchanged', () => {
+  for (const recovery of [undefined, { healthFraction: 0.06, ammoFraction: 0.14 }]) {
+    let observed: {healthFraction: number; ammoFraction: number} | undefined;
+    const director = new WaveDirector({
+      spawnPoints: makeSpawnPoints(), spawnEnemy: () => undefined, getActiveEnemyCount: () => 0,
+      definitions: [{number: 1, subtitle: 'test', composition: [{kind: 'boss', count: 1}], spawnInterval: 0.1, maxConcurrent: 1}],
+      announcementDuration: 0, recovery, onRecovery: event => { observed = event; },
+    });
+    director.start();
+    for (let tick = 0; tick < 4; tick += 1) director.update(0.25);
+    assert.equal(director.victory, true);
+    assert.equal(observed?.healthFraction, recovery?.healthFraction ?? 0.16);
+    assert.equal(observed?.ammoFraction, recovery?.ammoFraction ?? 0.32);
   }
 });

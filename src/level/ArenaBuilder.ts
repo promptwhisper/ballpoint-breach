@@ -5,6 +5,9 @@ import {
   type OutlinedMeshGroup,
 } from '../render/OutlinedMesh';
 import { DOODLE_PALETTE } from '../render/palette';
+import { PageShutters } from './PageShutters';
+import { WORLD_BASIS } from '../gameblocks/modules/math/WorldBasis';
+import { buildFreightStation } from './FreightStation';
 
 export type ArenaColliderCategory =
   | 'ground'
@@ -32,8 +35,11 @@ export interface EnemySpawnPoint {
   position: THREE.Vector3;
   yaw: number;
   elevation: 'ground' | 'mid' | 'high';
+  sector?: number;
   preferredFor: readonly ('grunt' | 'rusher' | 'heavy' | 'marksman')[];
 }
+
+export type LevelMode = 'classic' | 'fold-foundry' | 'dual-pages';
 
 export interface SupplyPoint {
   id: string;
@@ -144,6 +150,7 @@ export class BreakableBarricade {
   readonly collider: ArenaCollider;
   readonly raycastMeshes: readonly THREE.Mesh[];
   readonly maxHealth: number;
+  readonly interaction: 'shoot' | 'bridge-joint';
   health: number;
   broken = false;
 
@@ -158,11 +165,14 @@ export class BreakableBarricade {
     collider: ArenaCollider,
     activeRaycastMeshes: THREE.Mesh[],
     maxHealth = 90,
+    interaction: 'shoot' | 'bridge-joint' = 'shoot',
+    private readonly onBroken?: () => void,
   ) {
     this.id = id;
     this.root = root;
     this.collider = collider;
     this.maxHealth = maxHealth;
+    this.interaction = interaction;
     this.health = maxHealth;
     this.activeRaycastMeshes = activeRaycastMeshes;
     this.raycastMeshes = Object.freeze(pieces.map((piece) => piece.mesh));
@@ -175,6 +185,7 @@ export class BreakableBarricade {
     }));
     for (const mesh of this.raycastMeshes) {
       mesh.userData.breakableId = id;
+      mesh.userData.breakableInteraction = interaction;
       mesh.userData.raycastDisabled = false;
     }
   }
@@ -198,6 +209,7 @@ export class BreakableBarricade {
     this.health = 0;
     this.collider.enabled = false;
     this.brokenForSeconds = 0;
+    this.onBroken?.();
     const normalizedImpulse = impulse.lengthSq() > 1e-6
       ? impulse.clone().normalize()
       : new THREE.Vector3(0, 0.3, -1).normalize();
@@ -247,6 +259,7 @@ export class BreakableBarricade {
     this.brokenForSeconds = 0;
     this.root.visible = true;
     for (const piece of this.pieces) {
+      piece.visual.visible = true;
       piece.visual.position.copy(piece.initialPosition);
       piece.visual.quaternion.copy(piece.initialQuaternion);
       piece.velocity.set(0, 0, 0);
@@ -258,6 +271,36 @@ export class BreakableBarricade {
       mesh.userData.raycastDisabled = false;
       if (!this.activeRaycastMeshes.includes(mesh)) this.activeRaycastMeshes.push(mesh);
     }
+  }
+}
+
+class FoldBridge {
+  private falling = false;
+  private angle = 0;
+  private velocity = 0;
+
+  constructor(private readonly deck: THREE.Group, private readonly collider: ArenaCollider) {}
+
+  release(): void {
+    if (this.falling) return;
+    this.falling = true;
+    this.collider.enabled = false;
+  }
+
+  update(deltaSeconds: number): void {
+    if (!this.falling) return;
+    const delta = Math.min(Math.max(deltaSeconds, 0), 1 / 20);
+    this.velocity += WORLD_BASIS.up().y * 2.25 * delta;
+    this.angle = Math.min(Math.PI * 0.48, this.angle + this.velocity * delta);
+    this.deck.rotation.x = -this.angle;
+  }
+
+  reset(): void {
+    this.falling = false;
+    this.angle = 0;
+    this.velocity = 0;
+    this.deck.rotation.x = 0;
+    this.collider.enabled = true;
   }
 }
 
@@ -284,6 +327,11 @@ export interface ArenaBuildResult {
     impulse?: THREE.Vector3,
   ): BreakableDamageResult | undefined;
   resetBreakables(): void;
+  setEncounterPhase?(wave: number): void;
+  updateTactics?(dt: number, positions: readonly THREE.Vector3[]): void;
+  activatePageSwitch?(): boolean;
+  tacticalStatus?(): string;
+  objectives?: readonly { name: string; position: THREE.Vector3; firstWave: number; hint: string }[];
   dispose(): void;
 }
 
@@ -293,6 +341,7 @@ export interface ArenaBuilderOptions {
   hatchScale?: number;
   hatchStrength?: number;
   seed?: number;
+  levelMode?: LevelMode;
 }
 
 type ArenaMaterialName = 'paper' | 'shade' | 'lavender' | 'orange' | 'green' | 'red' | 'deep' | 'sky';
@@ -335,6 +384,10 @@ class ArenaAssembler {
   readonly grappleAnchors: GrappleAnchor[] = [];
   readonly ledges: ArenaLedge[] = [];
   readonly breakables: BreakableBarricade[] = [];
+  private readonly foldBridges: FoldBridge[] = [];
+  private pageShutters: PageShutters | null = null;
+  private readonly routeNodes: MutableWaypoint[] = [];
+  private readonly objectives: NonNullable<ArenaBuildResult['objectives']>[number][] = [];
 
   private readonly geometries = new Map<string, THREE.BufferGeometry>();
   private readonly outlinedMeshes: OutlinedMeshGroup[] = [];
@@ -361,6 +414,7 @@ class ArenaAssembler {
       hatchScale: options.hatchScale ?? 6.25,
       hatchStrength: options.hatchStrength ?? 0.86,
       seed: options.seed ?? 2095684248,
+      levelMode: options.levelMode ?? 'classic',
     };
     const common = {
       paperColor: DOODLE_PALETTE.paper,
@@ -393,16 +447,27 @@ class ArenaAssembler {
   }
 
   build(): ArenaBuildResult {
-    this.buildGroundAndPerimeter();
-    this.buildScaffold();
-    this.buildWindowedBuildings();
-    this.buildElevatedWalkways();
-    this.buildCrane();
-    this.buildScoutAircraft();
-    this.buildGroundProps();
-    this.buildBreakables();
-    this.buildGameplayMarkers();
-    const waypointGraph = this.buildWaypointGraph();
+    let waypointGraph: ArenaWaypointGraph;
+    if (this.options.levelMode === 'fold-foundry') {
+      this.buildFoldFoundryArena();
+      waypointGraph = this.buildChallengeWaypointGraph(-28, 28, -54, 30);
+      this.root.name = 'fold-foundry-arena';
+    } else if (this.options.levelMode === 'dual-pages') {
+      this.buildDualPagesArena();
+      waypointGraph = this.buildChallengeWaypointGraph(-30, 30, -34, 30);
+      this.root.name = 'dual-pages-arena';
+    } else {
+      this.buildGroundAndPerimeter();
+      this.buildScaffold();
+      this.buildWindowedBuildings();
+      this.buildElevatedWalkways();
+      this.buildCrane();
+      this.buildScoutAircraft();
+      this.buildGroundProps();
+      this.buildBreakables();
+      this.buildGameplayMarkers();
+      waypointGraph = this.buildWaypointGraph();
+    }
     this.root.updateWorldMatrix(true, true);
 
     const result: ArenaBuildResult = {
@@ -416,10 +481,15 @@ class ArenaAssembler {
       ledges: Object.freeze(this.ledges),
       waypointGraph,
       breakables: Object.freeze(this.breakables),
-      safePlayerSpawn: new THREE.Vector3(2, 0.32, 4.5),
+      safePlayerSpawn: this.options.levelMode === 'fold-foundry'
+        ? new THREE.Vector3(-3.8, 0.32, 27)
+        : this.options.levelMode === 'dual-pages'
+          ? new THREE.Vector3(-10, 0.32, 26)
+        : new THREE.Vector3(2, 0.32, 4.5),
       killY: -9,
       update: (deltaSeconds) => {
         for (const breakable of this.breakables) breakable.update(deltaSeconds);
+        for (const bridge of this.foldBridges) bridge.update(deltaSeconds);
         this.updateScoutAircraft(deltaSeconds);
       },
       syncColliderBounds: () => this.syncColliderBounds(),
@@ -429,7 +499,13 @@ class ArenaAssembler {
       },
       resetBreakables: () => {
         for (const breakable of this.breakables) breakable.reset();
+        for (const bridge of this.foldBridges) bridge.reset();
+        this.pageShutters?.reset();
       },
+      objectives: this.objectives,
+      updateTactics: (dt, positions) => this.pageShutters?.update(dt, positions),
+      activatePageSwitch: () => this.pageShutters?.requestFlip() ?? false,
+      tacticalStatus: () => this.pageShutters?.status ?? '',
       dispose: () => this.dispose(),
     };
     return result;
@@ -1153,6 +1229,288 @@ class ArenaAssembler {
     this.createBarricade('barricade-rear', new THREE.Vector3(-14.5, 0.05, -39), 0.2, 4.2, 2.15);
   }
 
+  private createInteractiveBreakable(
+    id: string,
+    root: THREE.Group,
+    pieces: OutlinedMeshGroup[],
+    maxHealth: number,
+    interaction: 'shoot' | 'bridge-joint',
+    onBroken?: () => void,
+  ): BreakableBarricade {
+    root.updateWorldMatrix(true, true);
+    const collider = this.addCollider(id, root, 'breakable', [interaction, 'interactive']);
+    const breakable = new BreakableBarricade(
+      id,
+      root,
+      pieces,
+      collider,
+      this.raycastMeshes,
+      maxHealth,
+      interaction,
+      onBroken,
+    );
+    this.breakables.push(breakable);
+    return breakable;
+  }
+
+
+  private challengeBox(parent: THREE.Object3D, id: string, x: number, y: number, z: number,
+    width: number, height: number, depth: number, material: ArenaMaterialName = 'paper',
+    category: ArenaColliderCategory | false = 'cover'): OutlinedMeshGroup {
+    return this.addBox(parent, id, new THREE.Vector3(width, height, depth),
+      WORLD_BASIS.fromBasis(x, y, -z), material, { collider: category, raycast: category !== false, tags: [id, 'challenge'] });
+  }
+
+  private challengeBounds(width: number, depth: number, z: number): void {
+    this.challengeBox(this.root, 'challenge-floor', 0, -0.2, z, width, 0.4, depth, 'paper', 'ground');
+    for (const side of [-1, 1]) {
+      this.challengeBox(this.root, `boundary-side-${side}`, side * width / 2, 2.8, z, 0.45, 5.6, depth, 'shade', 'wall');
+      this.challengeBox(this.root, `boundary-end-${side}`, 0, 2.8, z + side * depth / 2, width, 5.6, 0.45, 'shade', 'wall');
+    }
+  }
+
+  private challengeCrates(id: string, x: number, z: number, tall = false): void {
+    this.challengeBox(this.root, id, x, tall ? 1.3 : 0.7, z, 2.8, tall ? 2.6 : 1.4, 2.5, 'orange');
+    this.addCylinderBetween(this.root, id + '-cross-a', new THREE.Vector3(x - 1.25, 0.15, z + 1.26),
+      new THREE.Vector3(x + 1.25, tall ? 2.45 : 1.25, z + 1.26), 0.045, 'deep');
+    this.addCylinderBetween(this.root, id + '-cross-b', new THREE.Vector3(x + 1.25, 0.15, z + 1.27),
+      new THREE.Vector3(x - 1.25, tall ? 2.45 : 1.25, z + 1.27), 0.045, 'deep');
+  }
+
+  private challengeStairs(id: string, x: number, startZ: number, endZ: number, top: number, width = 3.2): void {
+    this.addStairFlight(this.root, id, new THREE.Vector3(x, 0, startZ), new THREE.Vector3(x, top, endZ), width, Math.ceil(top / 0.23), 'paper');
+    for (let i = 0; i <= 8; i++) {
+      this.routeNodes.push({ id: id + '-nav-' + i, position: new THREE.Vector3(x, top * i / 8 + 0.13, THREE.MathUtils.lerp(startZ, endZ, i / 8)), neighbors: [], tags: ['stairs'] });
+    }
+  }
+
+  private challengePaperWall(id: string, x: number, z: number, width: number, rows = 2): void {
+    for (let row = 0; row < rows; row++) for (let column = 0; column < 3; column++) {
+      const key = `${id}-${row}-${column}`;
+      const root = new THREE.Group(); root.name = key;
+      root.position.set(x + (column - 1) * width / 3, row * 1.3, z); this.root.add(root);
+      const panel = this.challengeBox(root, key + '-sheet', 0, 0.65, 0, width / 3 - 0.04, 1.28, 0.12, row ? 'paper' : 'shade', false);
+      // The complete visual belongs to the debris hierarchy, including the tear mark.
+      const mark = this.challengeBox(root, key + '-tear', 0, 0.72, 0.075, 0.07, 0.55, 0.025, 'red', false);
+      mark.rotation.z = 0.5;
+      this.raycastMeshes.push(panel.mesh);
+      this.createInteractiveBreakable(key, root, [panel, mark], 30, 'shoot');
+    }
+  }
+
+  private challengeBridge(id: string, x: number, z: number, height: number, length: number): void {
+    const deck = new THREE.Group(); deck.name = id; deck.position.set(x, height, z);
+    this.root.add(deck);
+    for (let i = 0; i < 6; i++) {
+      this.challengeBox(deck, id + '-fold-' + i, 0, 0, -(i + 0.5) * length / 6,
+        4.2, 0.18, length / 6 + 0.02, i % 2 ? 'shade' : 'paper', 'platform');
+    }
+    // Use one stable broadphase footprint for the bridge; panels only provide ray hits.
+    const panelColliders = this.colliders.splice(this.colliders.length - 6);
+    for (const item of panelColliders) delete item.object.userData.colliderId;
+    const collider = this.addCollider(id + '-deck', deck, 'platform', ['bridge', 'folding']);
+    this.foldBridges.push(new FoldBridge(deck, collider));
+    const bridge = this.foldBridges[this.foldBridges.length - 1]!;
+    for (const side of [-1, 1]) {
+      const root = new THREE.Group(); root.name = `${id}-joint-${side}`;
+      root.position.set(x + side * 1.9, height + 0.42, z - 0.6); this.root.add(root);
+      const tab = this.challengeBox(root, root.name + '-red', 0, 0, 0, 0.75, 0.75, 0.6, 'red', false);
+      this.raycastMeshes.push(tab.mesh);
+      this.createInteractiveBreakable(root.name, root, [tab], 38, 'bridge-joint', () => bridge.release());
+    }
+    for (let i = 0; i <= 5; i++) this.routeNodes.push({
+      id: id + '-nav-' + i, position: new THREE.Vector3(x, height + 0.12, z - i * length / 5),
+      neighbors: [], tags: ['elevated', 'marksman'],
+    });
+  }
+
+  private challengeSpawn(id: string, x: number, y: number, z: number, sector: number, high = false): void {
+    this.enemySpawnPoints.push({ id, position: new THREE.Vector3(x, y, z), sector,
+      yaw: 0, elevation: high ? 'high' : 'ground',
+      preferredFor: high ? ['marksman', 'grunt'] : ['grunt', 'rusher', 'heavy'] });
+  }
+
+  private challengeSupply(id: string, x: number, y: number, z: number, kind: SupplyPoint['kind']): void {
+    const point: SupplyPoint = { id, position: new THREE.Vector3(x, y, z), kind, respawnSeconds: 45 };
+    this.supplyPoints.push(point); this.addSupplyVisual(point);
+  }
+
+  private buildFoldFoundryArena(): void {
+    this.root.name = 'fold-foundry-arena';
+    this.challengeBounds(60, 88, -12);
+    buildFreightStation({
+      box: (id,x,y,z,w,h,d,material = 'paper',collider = 'cover') => { this.challengeBox(this.root,id,x,y,z,w,h,d,material,collider); },
+      pipe: (id,from,to,radius,material) => { this.addCylinderBetween(this.root,id,from,to,radius,material,false,false,8); },
+      stairs: (id,x,start,end,height,width) => this.challengeStairs(id,x,start,end,height,width),
+      bridge: (id,x,z,height,length) => this.challengeBridge(id,x,z,height,length),
+      paperWall: (id,x,z,width) => this.challengePaperWall(id,x,z,width),
+      crate: (id,x,z,tall) => this.challengeCrates(id,x,z,tall),
+      spawn: (id,x,y,z,sector,high) => this.challengeSpawn(id,x,y,z,sector,high),
+      supply: (id,x,y,z,kind) => this.challengeSupply(id,x,y,z,kind),
+      objective: (name,x,z,firstWave,hint) => { this.objectives.push({name,position:WORLD_BASIS.fromBasis(x,0.25,-z),firstWave,hint}); },
+      route: (id,x,y,z) => { this.routeNodes.push({id,position:WORLD_BASIS.fromBasis(x,y,-z),neighbors:[],tags:['ground']}); },
+    });
+  }
+
+  /** Solid industrial walls with authored openings, rather than decorative window frames. */
+  private reactorWall(id: string, x: number, z: number, length: number, along: 'x' | 'z',
+    doors: readonly { offset: number; width: number }[], height = 7.6, doorHeight = 4.4): void {
+    const sorted = [...doors].sort((a, b) => a.offset - b.offset);
+    let cursor = -length / 2;
+    const segment = (name: string, offset: number, span: number, y: number, h: number): void => {
+      if (span <= 0) return;
+      this.challengeBox(this.root, id + '-' + name, x + (along === 'x' ? offset : 0), y,
+        z + (along === 'z' ? offset : 0), along === 'x' ? span : 0.9, h,
+        along === 'z' ? span : 0.9, 'shade', 'wall');
+    };
+    sorted.forEach((door, index) => {
+      const edge = door.offset - door.width / 2;
+      segment('pier-' + index, (cursor + edge) / 2, edge - cursor, height / 2, height);
+      segment('lintel-' + index, door.offset, door.width, (height + doorHeight) / 2, height - doorHeight);
+      // Orange jambs make the passable opening legible at normal player height.
+      for (const side of [-1, 1]) {
+        const offset = door.offset + side * (door.width / 2 + 0.12);
+        this.challengeBox(this.root, `${id}-door-${index}-trim-${side}`,
+          x + (along === 'x' ? offset : 0), doorHeight / 2,
+          z + (along === 'z' ? offset : 0), along === 'x' ? 0.2 : 1,
+          doorHeight, along === 'z' ? 0.2 : 1, 'orange', false);
+      }
+      cursor = door.offset + door.width / 2;
+    });
+    segment('end', (cursor + length / 2) / 2, length / 2 - cursor, height / 2, height);
+  }
+
+  private reactorPump(id: string, x: number, z: number): void {
+    this.challengeBox(this.root, id + '-base', x, 0.55, z, 4.5, 1.1, 6, 'deep', 'cover');
+    this.addCylinderBetween(this.root, id + '-motor', new THREE.Vector3(x, 1.8, z - 2.5),
+      new THREE.Vector3(x, 1.8, z + 2.5), 1.2, 'lavender', true, 'cover', 10);
+    for (const dz of [-1.8, 1.8]) this.addCylinderBetween(this.root, id + '-band-' + dz,
+      new THREE.Vector3(x, 1.8, z + dz - 0.12), new THREE.Vector3(x, 1.8, z + dz + 0.12),
+      1.24, 'orange');
+    this.challengeBox(this.root, id + '-terminal', x + 1.25, 1.8, z + 2.8, 1.2, 2.5, 0.45, 'paper', 'cover');
+    for (let i = 0; i < 3; i++) this.challengeBox(this.root, id + '-vent-' + i,
+      x + 1.25, 2.2 - i * 0.3, z + 3.04, 0.8, 0.08, 0.025, 'deep', false);
+  }
+
+  private reactorRoute(id: string, points: readonly (readonly [number, number, number])[], elevated = false): void {
+    points.forEach(([x, y, z], index) => this.routeNodes.push({
+      id: `reactor-${id}-${index}`, position: new THREE.Vector3(x, y, z), neighbors: [],
+      tags: elevated ? ['elevated', 'marksman'] : ['ground'],
+    }));
+  }
+
+  private buildDualPagesArena(): void {
+    this.root.name = 'dual-pages-arena';
+    this.challengeBounds(64, 68, -2);
+
+    // Entrance: the offset security wall screens the core and makes the first engagement local.
+    this.challengeBox(this.root, 'reactor-security-wall', 0, 1.9, 19, 12, 3.8, 1, 'lavender', 'wall');
+    this.challengeBox(this.root, 'reactor-security-return', 6, 1.9, 21, 1, 3.8, 5, 'lavender', 'wall');
+    this.challengeBox(this.root, 'reactor-security-roof', 0, 4, 21.5, 13, 0.3, 6, 'shade', 'wall');
+    this.challengeBox(this.root, 'reactor-security-hatch', 0, 2, 19.53, 3.6, 1.7, 0.06, 'deep', false);
+    for (const x of [-1.05, 0, 1.05]) this.challengeBox(this.root, 'reactor-hatch-bar-' + x,
+      x, 2, 19.58, 0.06, 1.7, 0.025, 'orange', false);
+    this.challengeCrates('reactor-entry-crates', -18, 23, true);
+    this.challengeCrates('reactor-entry-east-cover', 19, 20);
+
+    // A recognizable machinery hall, with a short exposed route and a covered service bypass.
+    this.reactorWall('reactor-south-wall', 0, 12, 40, 'x', [{ offset: -12, width: 7 }, { offset: 12, width: 7 }]);
+    this.reactorWall('reactor-north-wall', 0, -26, 40, 'x', [{ offset: -12, width: 7 }, { offset: 12, width: 7 }]);
+    for (const side of [-1, 1]) {
+      this.reactorWall('reactor-side-wall-' + side, side * 20, -7, 38, 'z',
+        [{ offset: -14, width: 7 }, { offset: 12, width: 7 }]);
+      this.challengeBox(this.root, 'reactor-roof-band-' + side, side * 16, 8.15, -7,
+        8, 0.3, 38, 'shade', 'wall');
+      // The large skylight exposes the core silhouette without turning every wall into a scaffold.
+      this.challengeBox(this.root, 'reactor-roof-lip-' + side, side * 12, 8.5, -7,
+        0.25, 0.7, 38, 'orange', false);
+    }
+    this.challengeBox(this.root, 'reactor-west-service-roof', -26, 3.85, -5, 11, 0.3, 38, 'shade', 'wall');
+    this.challengeBox(this.root, 'reactor-east-pump-roof', 26, 3.85, -9, 11, 0.3, 30, 'shade', 'wall');
+    this.reactorWall('reactor-east-service-divider', 26, -6, 11, 'x', [{ offset: 0, width: 4.5 }], 3.7, 3.1);
+    this.challengeBox(this.root, 'reactor-west-service-baffle', -23, 1.55, -5, 5, 3.1, 1.1, 'lavender', 'wall');
+    this.challengeCrates('reactor-east-service-cover', 28.3, -14, true);
+    this.challengeCrates('reactor-west-service-cover', -29.5, 7);
+
+    // The core blocks both bullets and movement; all four surrounding lanes remain walkable.
+    this.challengeBox(this.root, 'reactor-core-plinth', 0, 0.6, -6, 9, 1.2, 9, 'deep', 'cover');
+    this.addCylinderBetween(this.root, 'reactor-core-vessel', new THREE.Vector3(0, 1.15, -6),
+      new THREE.Vector3(0, 6.8, -6), 4.2, 'paper', true, 'column', 12);
+    for (const y of [1.4, 4.7, 6.6]) this.addCylinderBetween(this.root, 'reactor-core-band-' + y,
+      new THREE.Vector3(0, y - 0.14, -6), new THREE.Vector3(0, y + 0.14, -6), 4.27, 'orange');
+    this.addCylinderBetween(this.root, 'reactor-core-exhaust', new THREE.Vector3(0, 6.8, -6),
+      new THREE.Vector3(0, 9.4, -6), 1.4, 'deep', true, 'column', 10);
+    this.addCylinderBetween(this.root, 'reactor-core-feed', new THREE.Vector3(0, 7.7, -6),
+      new THREE.Vector3(14, 7.7, -6), 0.45, 'orange', true, 'column', 8);
+    this.reactorPump('reactor-east-pump', 9.5, 3);
+    this.reactorPump('reactor-west-pump', -9.5, -15);
+
+    // Two stair approaches join a U-shaped balcony. Its low parapets cover specific floor lanes.
+    for (const side of [-1, 1]) {
+      const x = side * 16.5;
+      this.challengeStairs('reactor-stairs-' + side, x, 10, -4, 4.2, 4.5);
+      this.challengeBox(this.root, 'reactor-side-balcony-' + side, x, 4.05, -14.5,
+        6, 0.3, 21, 'shade', 'platform');
+      for (const z of [-8, -17]) {
+        this.challengeBox(this.root, `reactor-balcony-parapet-${side}-${z}`, side * 13.65,
+          4.63, z, 0.3, 0.86, 5.5, 'lavender', 'cover');
+      }
+      this.challengeBox(this.root, 'reactor-balcony-support-' + side, side * 18.5,
+        2, -16, 1, 4, 1, 'lavender', 'column');
+      this.reactorRoute('balcony-' + side, [[x,4.34,-4],[x,4.34,-8],[x,4.34,-12],
+        [x,4.34,-16],[x,4.34,-20],[x,4.34,-23]], true);
+    }
+    this.challengeBox(this.root, 'reactor-north-balcony', 0, 4.05, -23,
+      39, 0.3, 4, 'shade', 'platform');
+    for (const x of [-9, 9]) this.challengeBox(this.root, 'reactor-north-parapet-' + x,
+      x, 4.63, -20.9, 7, 0.86, 0.3, 'lavender', 'cover');
+    this.reactorRoute('north-balcony', [[-16,4.34,-23],[-12,4.34,-23],[-8,4.34,-23],
+      [-4,4.34,-23],[0,4.34,-23],[4,4.34,-23],[8,4.34,-23],[12,4.34,-23],[16,4.34,-23]], true);
+
+    // The rear control room is approached through either side door; consoles break boss sightlines.
+    for (const x of [-6, 6]) {
+      this.challengeBox(this.root, 'reactor-control-desk-' + x, x, 0.65, -29, 4.5, 1.3, 1.8, 'lavender', 'cover');
+      this.challengeBox(this.root, 'reactor-control-display-' + x, x, 1.7, -29.55, 3.5, 0.9, 0.15, 'deep', false);
+      for (const dx of [-1, 0, 1]) this.challengeBox(this.root, `reactor-control-key-${x}-${dx}`,
+        x + dx, 1.33, -28.8, 0.45, 0.06, 0.35, 'orange', false);
+    }
+    this.challengeBox(this.root, 'reactor-control-divider', 0, 1.6, -33.6, 8, 3.2, 0.8, 'shade', 'wall');
+    this.challengeCrates('reactor-north-west-cover', -23, -30);
+    this.challengeCrates('reactor-north-east-cover', 25, -29, true);
+
+    // Door-center samples prevent a coarse navigation grid from severing the service loops.
+    this.reactorRoute('entry', [[-8,0.14,25],[-10,0.14,21],[-12,0.14,17],[-12,0.14,12],[-12,0.14,8],
+      [10,0.14,25],[12,0.14,20],[12,0.14,16],[12,0.14,12],[12,0.14,8]]);
+    for (const side of [-1, 1]) {
+      const passageX = side < 0 ? -28 : 26;
+      this.reactorRoute('service-' + side, [[side*16,0.14,5],[side*20,0.14,5],[side*25,0.14,5],
+        [passageX,0.14,1],[passageX,0.14,-3],[passageX,0.14,-7],[side*26,0.14,-11],
+        [side*26,0.14,-17],[side*26,0.14,-21],[side*20,0.14,-21],[side*16,0.14,-21]]);
+      this.reactorRoute('control-door-' + side, [[side*12,0.14,-21],[side*12,0.14,-26],
+        [side*12,0.14,-30],[side*8,0.14,-32],[side*4,0.14,-31],[0,0.14,-31]]);
+    }
+
+    for (const [sector, points] of [
+      [0, [[-12,7],[12,8],[-26,13],[26,10],[-10,17],[10,16]]],
+      [1, [[-9,-4],[10,-11],[-27,-2],[26,-10],[-8,-10],[10,-17]]],
+      [2, [[-12,-30],[12,-30],[-25,-25],[27,-23],[-3,-23],[4,-18]]],
+    ] as const) points.forEach(([x,z], index) => this.challengeSpawn(`gallery-s${sector}-ground-${index}`,x,0.25,z,sector));
+    for (const [sector, z] of [[0,-6],[1,-14],[2,-23]] as const) {
+      for (const side of [-1,1]) this.challengeSpawn(`gallery-s${sector}-high-${side < 0 ? 0 : 1}`,
+        side * 15.6,4.4,z,sector,true);
+    }
+    this.challengeSpawn('gallery-boss',0,0.25,-30.5,2);
+    this.challengeSupply('reactor-entry-ammo',-26,0.25,20,'ammo');
+    this.challengeSupply('reactor-service-health',-29,0.25,-13,'health');
+    this.challengeSupply('reactor-balcony-cache',0,4.4,-23,'mixed');
+    this.challengeSupply('reactor-control-ammo',27,0.25,-32,'ammo');
+    this.objectives.push(
+      {name:'门厅入口',position:new THREE.Vector3(0,0.25,15),firstWave:1,hint:'侧门进入机房 · 留意楼梯上的交叉火力'},
+      {name:'涡轮机房',position:new THREE.Vector3(-10,0.25,-6),firstWave:3,hint:'绕涡轮换位 · 西侧维修通道可绕后'},
+      {name:'北侧控制区',position:new THREE.Vector3(0,0.25,-29),firstWave:5,hint:'从两侧门突入 · 压制高台再穿越机房'},
+    );
+  }
+
   private addSupplyVisual(point: SupplyPoint): void {
     const group = new THREE.Group();
     group.name = point.id;
@@ -1343,6 +1701,38 @@ class ArenaAssembler {
     ] as const) connect(a, b);
 
     return new ArenaWaypointGraph([...nodes.values()]);
+  }
+
+
+  /** Sample walkable ground and roofs, plus authored stairs, instead of routing through solid machines. */
+  private buildChallengeWaypointGraph(minX: number, maxX: number, minZ: number, maxZ: number): ArenaWaypointGraph {
+    const nodes: MutableWaypoint[] = [...this.routeNodes];
+    const solid = this.colliders.filter(c => !c.tags.includes('page-shutter'));
+    for(let x=minX;x<=maxX;x+=4) for(let z=minZ;z<=maxZ;z+=4) {
+      const floors = solid.filter(c => ['ground','platform'].includes(c.category)
+        && x > c.min.x + 0.45 && x < c.max.x - 0.45 && z > c.min.z + 0.45 && z < c.max.z - 0.45);
+      for(const floor of floors) {
+        const y=floor.max.y + 0.14;
+        if(solid.some(c => c!==floor && c.min.y<y+1.65 && c.max.y>y+0.4
+          && x>c.min.x-0.55 && x<c.max.x+0.55 && z>c.min.z-0.55 && z<c.max.z+0.55)) continue;
+        nodes.push({id:`route-${x}-${z}-${floor.id}`,position:new THREE.Vector3(x,y,z),neighbors:[],tags:y>2?['elevated','marksman']:['ground']});
+      }
+    }
+    for(let i=0;i<nodes.length;i++) for(let j=i+1;j<nodes.length;j++) {
+      const a=nodes[i]!,b=nodes[j]!;
+      const dy=Math.abs(a.position.y-b.position.y);
+      const distance=a.position.distanceTo(b.position);
+      if(distance>6.1 || (dy>0.5 && !(a.tags.includes('stairs')||b.tags.includes('stairs')))) continue;
+      if(dy>1.4) continue;
+      let blocked=false;
+      for(let t=0.2;t<1;t+=0.2) {
+        const point=a.position.clone().lerp(b.position,t);
+        if(solid.some(c=>c.min.y<point.y+1.4 && c.max.y>point.y+0.45
+          && point.x>c.min.x-0.3&&point.x<c.max.x+0.3&&point.z>c.min.z-0.3&&point.z<c.max.z+0.3)) {blocked=true;break;}
+      }
+      if(!blocked) {a.neighbors.push(b.id);b.neighbors.push(a.id);}
+    }
+    return new ArenaWaypointGraph(nodes.filter(n=>n.neighbors.length>0));
   }
 
   private syncColliderBounds(): void {

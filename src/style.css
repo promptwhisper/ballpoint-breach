@@ -1,12 +1,24 @@
-@import '@fontsource/patrick-hand';
+@font-face{font-family:'Ballpoint Marker';src:url('./assets/fonts/ballpoint-marker.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'Ballpoint Hand';src:url('./assets/fonts/ballpoint-hand.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}
 
-:root{font-family:'Patrick Hand','Chalkboard SE','Comic Sans MS',cursive;color:#27348f;background:#f6f0dc;font-synthesis:none;touch-action:manipulation;--ink:#27348f;--ink-dark:#18246f;--red:#d63b55;--orange:#e79a32;--green:#69b887;--paper:#f6f0dc;--reticle-spread:22px;--damage-strength:.4}
+[hidden]{display:none!important}
+
+/* Two embedded handwritten families; no OS-specific Chinese font overrides. */
+h1,h2,.level-card strong,#wave-banner strong,.hud-weapons>strong{font-family:var(--font-title);font-weight:400!important}
+input,output,select,textarea{font-family:var(--font-hand)}
+#hud,.hud-wave,.hud-wave small,.hud-health b,.hud-ammo strong,.hud-ammo span,.hud-weapons li.selected,.overlay-card button,#touch-controls button{font-weight:400}
+#game-overlay .overlay-card h1{line-height:1.18;letter-spacing:.03em}
+.hud-weapons>strong{line-height:1.3!important}
+#wave-banner strong{line-height:1.2!important}
+#stage{display:none}
+
+:root{--font-title:'Ballpoint Marker',sans-serif;--font-hand:'Ballpoint Hand',sans-serif;font-family:var(--font-hand);color:#27348f;background:#f6f0dc;font-synthesis:none;touch-action:manipulation;--ink:#27348f;--ink-dark:#18246f;--red:#d63b55;--orange:#e79a32;--green:#69b887;--paper:#f6f0dc;--reticle-spread:22px;--damage-strength:.4}
 
 /* Settings share the rotated game shell and stay clear of host navigation. */
 #settings-toggle{position:absolute;z-index:35;top:76px;right:22px;right:calc(22px + var(--safe-area-inset-right,env(safe-area-inset-right,0px)));width:46px;height:46px;display:flex;align-items:center;justify-content:center;padding:0;border:1px solid rgba(39,52,143,.25);border-radius:50%;color:var(--ink);background:rgba(246,240,220,.72);touch-action:manipulation;cursor:pointer}
 #settings-toggle svg{pointer-events:none}
 #settings-toggle:active{background:rgba(39,52,143,.13)}
-#settings-panel{position:absolute;inset:0;top:0;right:0;bottom:0;left:0;z-index:45;display:flex;align-items:center;justify-content:center;background:rgba(24,36,111,.28);font:15px/1.4 system-ui,sans-serif;pointer-events:auto}
+#settings-panel{position:absolute;inset:0;top:0;right:0;bottom:0;left:0;z-index:45;display:flex;align-items:center;justify-content:center;background:rgba(24,36,111,.28);font:15px/1.4 var(--font-hand);pointer-events:auto}
 #settings-panel[hidden]{display:none}
 .settings-card{width:420px;max-width:calc(100% - 160px);max-height:calc(100% - 24px);overflow:auto;box-sizing:border-box;padding:16px 22px;background:var(--paper);border:2px solid var(--ink);border-radius:12px;box-shadow:5px 5px 0 rgba(39,52,143,.2);touch-action:pan-y}
 .settings-card header,.settings-row{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:10px}
@@ -21,7 +33,7 @@
 .settings-card small{display:block;font-size:12px;opacity:.78}.settings-card :focus-visible,#settings-toggle:focus-visible{outline:2px solid var(--red);outline-offset:3px}
 #touch-controls .action-fire{display:none;position:absolute;right:198px;bottom:34px;width:82px;height:82px;border:3px solid var(--red);background:rgba(246,240,220,.84);color:var(--red)}
 body[data-fire-mode=button] #touch-controls .action-fire{display:block}
-#touch-controls .action-fire span{font-size:34px;line-height:36px}#touch-controls .action-fire small{font:13px system-ui,sans-serif}
+#touch-controls .action-fire span{font-size:34px;line-height:36px}#touch-controls .action-fire small{font:13px var(--font-hand)}
 #touch-controls .action-fire.active{background:var(--red);color:var(--paper);transform:scale(.96)}
 *{box-sizing:border-box}
 html,body,#app{width:100%;height:100%;margin:0;display:block;overflow:hidden;background:var(--paper)}
@@ -94,7 +106,7 @@ body.player-hit #vignette::before{animation:player-damage-wash 680ms cubic-bezie
 #touch-controls button span,#touch-controls button small{display:block;pointer-events:none}#touch-controls button span{font-size:20px;line-height:18px}#touch-controls button small{font-size:9px;line-height:12px;letter-spacing:.02em}
 .touch-move{position:absolute;left:18px;left:calc(18px + var(--safe-area-inset-left,env(safe-area-inset-left,0px)));bottom:22px;width:132px;height:132px;border:3px solid rgba(39,52,143,.68);border-radius:50%;background:rgba(246,240,220,.32);box-shadow:inset 0 0 0 10px rgba(39,52,143,.045);pointer-events:auto;touch-action:none}
 .touch-move::before{content:"";position:absolute;left:50%;top:50%;width:76px;height:76px;margin-left:-38px;margin-top:-38px;border:1px dashed rgba(39,52,143,.28);border-radius:50%}
-.touch-move::after{content:"SPRINT";position:absolute;left:50%;top:-20px;width:70px;margin-left:-35px;color:var(--ink);font-size:10px;font-weight:900;letter-spacing:.08em;text-align:center;opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s}.touch-move.sprinting::after{opacity:.78;transform:translateY(0)}
+.touch-move::after{content:"冲刺";position:absolute;left:50%;top:-20px;width:70px;margin-left:-35px;color:var(--ink);font-size:10px;font-weight:900;letter-spacing:.08em;text-align:center;opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s}.touch-move.sprinting::after{opacity:.78;transform:translateY(0)}
 .touch-stick{position:absolute;left:50%;top:50%;width:54px;height:54px;margin-left:-27px;margin-top:-27px;border:2px solid var(--ink);border-radius:50%;background:rgba(246,240,220,.88);box-shadow:3px 3px 0 rgba(39,52,143,.15);transform:translate(0,0)}
 .touch-stick::after{content:"";position:absolute;left:50%;top:50%;width:8px;height:8px;margin-left:-4px;margin-top:-4px;border-radius:50%;background:var(--red);opacity:.7}.touch-move.active .touch-stick{background:rgba(231,154,50,.78)}
 .touch-actions{position:absolute;right:22px;right:calc(22px + var(--safe-area-inset-right,env(safe-area-inset-right,0px)));bottom:20px;width:158px;height:176px;pointer-events:none}
@@ -115,7 +127,7 @@ body.player-hit #vignette::before{animation:player-damage-wash 680ms cubic-bezie
   .hud-health{left:150px;bottom:58px;font-size:12px}.hud-health>i{min-width:92px;width:12vw}
   .hud-weapons{right:150px;bottom:12px;min-width:130px;width:17vw}.hud-weapons ol{display:none}.hud-weapons>strong{font-size:24px}
   .ability-meter{bottom:2%;transform:translateX(-50%) scale(.84)}#block-stamina{bottom:9%}
-  #context-tip{bottom:14%;font-size:12px}#wave-banner{top:12%}#wave-banner strong{font-size:44px}
+  #context-tip{bottom:14%;font-size:12px}#wave-banner{top:18%}#wave-banner strong{font-size:38px}
   #stage{display:none}
 }
 
@@ -134,6 +146,42 @@ body.player-hit #vignette::before{animation:player-damage-wash 680ms cubic-bezie
   .hud-health{left:250px;bottom:58px;font-size:12px}.hud-health>i{min-width:92px;width:12vw}
   .hud-weapons{display:block;right:270px;bottom:12px;min-width:130px;width:17vw}.hud-weapons ol,.hud-weapons>small{display:none}.hud-weapons>strong{font-size:24px}
   .ability-meter{bottom:2%;transform:translateX(-50%) scale(.84)}#block-stamina{bottom:9%}
-  #context-tip{bottom:14%;font-size:12px}#wave-banner{top:12%}#wave-banner strong{font-size:44px}
+  #context-tip{bottom:14%;font-size:12px}#wave-banner{top:18%}#wave-banner strong{font-size:38px}
   #stage{display:none}
+}
+/* One start page: each illustrated card starts its level in the same document. */
+#game-overlay[data-mode=start] .overlay-card{width:82%;max-width:960px;padding:26px 30px 22px;transform:none}
+#game-overlay[data-mode=start] h1{font-family:var(--font-title);font-size:42px;line-height:1.1;letter-spacing:.03em;margin:9px 0}
+#game-overlay[data-mode=start] .controls-grid{display:none}
+#level-choices{display:flex;gap:14px;text-align:left;margin-top:20px}
+.overlay-card .level-card{flex:1;min-width:0;text-align:left;background:rgba(255,253,243,.7);color:var(--ink);border:2px solid var(--ink);padding:14px 16px;box-shadow:4px 4px 0 rgba(39,52,143,.18);font-weight:400}
+.level-card .level-number{display:block;font-size:11px;letter-spacing:.09em;opacity:.75}
+.level-card svg{display:block;width:100%;height:88px;margin:6px 0;fill:none;stroke:var(--ink);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.level-card svg .accent{stroke:var(--red);stroke-width:2.3}
+.level-card strong{display:block;font-family:var(--font-title);font-size:25px}
+.level-card small{display:block;font:12px/1.6 var(--font-hand);margin:7px 0 12px;min-height:38px}
+.level-card .level-meta{display:block;border-top:1px dashed rgba(39,52,143,.35);padding-top:9px;font:11px/1.4 var(--font-hand);color:var(--red)}
+.overlay-card .level-card:hover{background:#f3e9cd}
+.overlay-actions{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:12px;margin-top:10px}
+.overlay-actions button{min-height:44px}
+#save-card-button{background:var(--paper);color:var(--ink);border:2px solid var(--ink);box-shadow:4px 4px 0 var(--orange)}
+#return-menu-button{background:transparent;color:var(--ink);border:1px solid var(--ink);box-shadow:none}
+.share-status{min-height:20px;margin:12px 0 0!important;font:13px/1.45 var(--font-hand);color:var(--ink)}
+.share-status[data-state=error]{color:var(--red)}
+.share-status[data-state=saved]{color:#2d724d}
+#level-objective{position:absolute;left:50%;top:9%;transform:translateX(-50%);background:rgba(246,240,220,.85);border-bottom:1px solid rgba(39,52,143,.3);padding:5px 10px;font:12px/1.4 var(--font-hand);white-space:nowrap;max-width:65%;text-align:center}
+body[data-game-mode=start] #hud,body[data-game-mode=start] #touch-controls{visibility:hidden}
+body:not([data-game-mode=playing]) #level-objective{display:none}
+@media (orientation:portrait),(max-height:520px){
+ #game-overlay[data-mode=start] .overlay-card{width:76%;max-width:930px;padding:12px 18px}
+ #game-overlay[data-mode=start] h1{font-size:29px;margin:5px 0}
+ #game-overlay[data-mode=start] .eyebrow{font-size:10px}
+ #game-overlay[data-mode=start] #overlay-copy{font:11px var(--font-hand);margin-bottom:8px}
+ #level-choices{gap:10px;margin-top:10px}
+ .overlay-card .level-card{padding:8px 12px}
+ .level-card svg{height:62px;margin:3px 0}
+ .level-card strong{font-size:21px}
+ .level-card small{font-size:10px;min-height:28px;margin:4px 0 6px}
+ .level-card .level-meta{font-size:10px;padding-top:6px}
+ #level-objective{font-size:10px;top:9%;padding:3px 6px}
 }

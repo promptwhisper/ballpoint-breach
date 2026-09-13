@@ -17,6 +17,7 @@ test('arena exposes complete gameplay contracts and valid AABB colliders', () =>
     assert.ok(arena.grappleAnchors.length >= 8, 'needs environment grapple anchors');
     assert.ok(arena.ledges.length >= 8, 'needs meaningful high ledges');
     assert.ok(arena.breakables.length >= 4, 'needs multiple breakable barricades');
+    assert.equal(arena.root.getObjectByName('fold-foundry-stage'), undefined, 'classic arena must remain untouched by alternate modes');
     assert.ok(arena.raycastMeshes.length > 40, 'arena surfaces should be raycastable');
     assert.ok(arena.colliders.length > 30, 'arena requires explicit collision coverage');
 
@@ -160,4 +161,100 @@ test('barricades disable collision and world raycasts, then reset cleanly', () =
     arena.dispose();
     assert.equal(getOutlineCacheStats().references, 0);
   }
+});
+
+test('foundry has connected ground and elevated routes even after both bridges collapse', () => {
+  const arena = new ArenaBuilder({levelMode:'fold-foundry'}).build();
+  try {
+    assert.equal(arena.objectives?.length,3);
+    assert.ok(arena.breakables.filter(b=>b.id.startsWith('paper-wall')).length>=18);
+    const graph=arena.waypointGraph;
+    const visited=new Set<string>(); const queue=[graph.nodes[0]!];
+    while(queue.length) {const n=queue.pop()!;if(visited.has(n.id))continue;visited.add(n.id);queue.push(...graph.neighborsOf(n.id));}
+    assert.equal(visited.size,graph.nodes.length,'all authored combat floors connect');
+    for(const side of ['west','east']) {
+      const joint=arena.breakables.find(b=>b.id==='fold-'+side+'-bridge-joint--1')!;
+      assert.ok(joint);
+      arena.damageBreakable(joint.id,100);
+    }
+    for(let i=0;i<20;i++) arena.update(0.05);
+    assert.ok(arena.colliders.filter(c=>c.tags.includes('folding')).every(c=>!c.enabled));
+    assert.ok(arena.colliders.find(c=>c.id==='collider-challenge-floor')?.enabled,'collapse never removes the traversable ground');
+    assert.ok(arena.root.getObjectByName('fold-west-bridge')!.rotation.x < -0.1);
+    arena.resetBreakables();
+    assert.ok(arena.colliders.filter(c=>c.tags.includes('folding')).every(c=>c.enabled));
+    assert.ok(arena.breakables.every(b=>!b.broken));
+  } finally {arena.dispose();}
+});
+
+test('foundry spawn points have supported feet, body clearance and nearby connected routes', () => {
+  const arena = new ArenaBuilder({ levelMode: 'fold-foundry' }).build();
+  try {
+    for (const spawn of arena.enemySpawnPoints) {
+      const floor = arena.colliders.find(collider => ['ground', 'platform'].includes(collider.category)
+        && Math.abs(collider.max.y - spawn.position.y) < 0.45
+        && spawn.position.x > collider.min.x + 0.3 && spawn.position.x < collider.max.x - 0.3
+        && spawn.position.z > collider.min.z + 0.3 && spawn.position.z < collider.max.z - 0.3);
+      assert.ok(floor, `${spawn.id} requires supported ground`);
+      assert.equal(arena.colliders.some(collider => collider.enabled && collider !== floor
+        && collider.min.y < spawn.position.y + 1.7 && collider.max.y > spawn.position.y + 0.5
+        && spawn.position.x > collider.min.x - 0.5 && spawn.position.x < collider.max.x + 0.5
+        && spawn.position.z > collider.min.z - 0.5 && spawn.position.z < collider.max.z + 0.5), false,
+      `${spawn.id} must have body clearance`);
+      const node = arena.waypointGraph.nearest(spawn.position);
+      assert.ok(node && node.position.distanceTo(spawn.position) < 4,
+        `${spawn.id} must be close to a reachable route`);
+    }
+    const landing = arena.colliders.find(collider => collider.id === 'collider-dispatch-roof-connection');
+    assert.ok(landing && landing.min.x < 21 && landing.max.z > -47,
+      'the dispatch landing must overlap both the office roof and the stair top');
+  } finally { arena.dispose(); }
+});
+
+test('reactor routes connect both floors and solid machinery limits long-range firing', () => {
+  const arena = new ArenaBuilder({ levelMode: 'dual-pages' }).build();
+  try {
+    assert.deepEqual(arena.objectives?.map(objective => objective.firstWave), [1, 3, 5]);
+    assert.equal(arena.colliders.some(collider => collider.tags.includes('page-shutter')), false);
+    assert.equal(arena.activatePageSwitch?.(), false, 'the combat map has no timed routing switches');
+    const graph = arena.waypointGraph;
+    const first = graph.nearest(arena.safePlayerSpawn)!;
+    const reachable = new Set<string>();
+    const queue = [first];
+    while (queue.length) {
+      const node = queue.pop()!;
+      if (reachable.has(node.id)) continue;
+      reachable.add(node.id);
+      queue.push(...graph.neighborsOf(node.id));
+    }
+    assert.equal(reachable.size, graph.nodes.length, 'entry, ground ring, service bypass and balconies must connect');
+    for (const spawn of arena.enemySpawnPoints) {
+      const floor = arena.colliders.find(collider => ['ground', 'platform'].includes(collider.category)
+        && Math.abs(collider.max.y - spawn.position.y) < 0.45
+        && spawn.position.x > collider.min.x + 0.3 && spawn.position.x < collider.max.x - 0.3
+        && spawn.position.z > collider.min.z + 0.3 && spawn.position.z < collider.max.z - 0.3);
+      assert.ok(floor, `${spawn.id} requires supported ground`);
+      assert.equal(arena.colliders.some(collider => collider.enabled && collider !== floor
+        && collider.min.y < spawn.position.y + 1.7 && collider.max.y > spawn.position.y + 0.5
+        && spawn.position.x > collider.min.x - 0.5 && spawn.position.x < collider.max.x + 0.5
+        && spawn.position.z > collider.min.z - 0.5 && spawn.position.z < collider.max.z + 0.5), false,
+      `${spawn.id} must have body clearance`);
+      assert.ok(graph.nearest(spawn.position)!.position.distanceTo(spawn.position) < 4,
+        `${spawn.id} must be close to a reachable route`);
+    }
+    const sightline = (from: THREE.Vector3, to: THREE.Vector3): boolean => {
+      const ray = new THREE.Raycaster(from, to.clone().sub(from).normalize(), 0, from.distanceTo(to));
+      return ray.intersectObjects(arena.raycastMeshes, false).length === 0;
+    };
+    assert.equal(sightline(new THREE.Vector3(0,1.7,26), new THREE.Vector3(0,1.7,-15)), false,
+      'spawn must not see the entire hall');
+    assert.equal(sightline(new THREE.Vector3(-8,1.7,-6), new THREE.Vector3(8,1.7,-6)), false,
+      'the central vessel must interrupt cross-map shots');
+    assert.equal(sightline(new THREE.Vector3(-24,1.7,-21), new THREE.Vector3(-16,1.7,-21)), true,
+      'the service passage must have a real open doorway into the hall');
+    assert.equal(sightline(new THREE.Vector3(-15.6,5.9,-6), new THREE.Vector3(-11,1.7,3)), true,
+      'balcony defenders must threaten their near floor lane');
+    assert.equal(sightline(new THREE.Vector3(-15.6,5.9,-6), new THREE.Vector3(10,1.7,-8)), false,
+      'the same balcony must not cover the floor behind the core');
+  } finally { arena.dispose(); }
 });

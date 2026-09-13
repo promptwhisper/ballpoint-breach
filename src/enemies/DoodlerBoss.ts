@@ -82,6 +82,12 @@ export class DoodlerBoss extends DoodleEnemy {
       case 'seek':
       case 'strafe':
         this.faceDirection(toPlayer, delta);
+        if (this.combatProfile !== 'classic' && !context.hasLineOfSight(this.getEyePosition(), context.player.position, this)) {
+          const waypoint = context.navigationTarget(this, context.player.position) ?? context.player.position;
+          this.moveToward(waypoint, this.stats.speed * 1.15, delta, context);
+          this.poseWalk(this.elapsed * 7.4);
+          break;
+        }
         if (this.attackCooldown <= 0 && context.player.alive !== false) {
           this.startBossAttack(distance);
         } else {

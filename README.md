@@ -46,8 +46,7 @@ npm run build
 | Left mouse | Fire / slash |
 | Right mouse | Aim / katana block |
 | R | Reload |
-| 1–5 / wheel | Switch weapon |
-| Q | Grapple an enemy or anchor |
+| 1–6 / wheel | Switch weapon |
 | Escape | Release pointer and pause |
 
 Click **CLICK TO ENTER THE PAGE** to acquire pointer lock. A paused game resumes when the page is clicked again.
@@ -67,11 +66,31 @@ The arsenal contains:
 - a five-round bolt-action sniper with a circular scope;
 - a katana with an arc slash, finite block stamina, and timed projectile returns.
 
-Q fires a bounded blue line. Enemy hits pull the target toward the player; designated arena anchors lightly pull the player. World ray tests prevent grapples and gunfire from passing through walls.
+The start page has three illustrated level cards; clicking a card starts its level immediately in the same
+document. Pause and results screens offer a return to that start page, with no extra level confirmation.
+
+**Freight Station** (`fold-foundry`, 60 × 88) connects loading tracks, a maintenance hall and a dispatch
+yard. Opaque freight cars require clearing corners; two offset warehouse entrances offer alternative
+approaches. Loading platforms, machinery, accessible roof stairs and two destructible catwalks create
+contested firing positions. Ground routes remain intact if a catwalk collapses.
+
+**Turbine Hall** (`dual-pages`, 64 × 68) connects an entrance lobby, a machine room and a rear control
+area. The solid central turbine interrupts crossfire; covered service passages and a U-shaped balcony
+offer different rotations. Low parapets, stair approaches and exposed supplies reward controlled movement.
+There are no timed room shutters. See [the design reference and validation contract](docs/FPS_LEVEL_REDESIGN.md).
+
+Each new map has three sequential combat sectors and six encounters, ending in a boss battle. After a
+sector is cleared, a directional distance hint guides the player to the next sector; entering its approach
+starts the next encounter automatically. All modes use the same five weapons. The classic construction
+arena retains its ten-wave survival loop. New-map waves mix riflemen, flankers, heavies and marksmen,
+with up to 14 active enemies including boss summons. Their engagement ranges and pursuit are tuned to
+these larger spaces, while clear rewards are reduced to six health and 14% reserve ammunition.
+
+The mini-tool version has no grapple action or HOOK control. World ray tests prevent gunfire from passing through walls.
 
 ## Architecture
 
-- `src/game/` owns the main loop, state, world queries, supplies, and grapple integration.
+- `src/game/` owns the main loop, state, world queries, and supplies. The legacy grapple module is not connected to gameplay.
 - `src/render/` contains the shared cross-hatch shader and cached outline helper.
 - `src/level/` procedurally assembles the construction arena, colliders, waypoint graph, ledges, supplies, grapple anchors, and breakables.
 - `src/player/` and `src/physics/` implement the kinematic capsule controller.
@@ -104,7 +123,11 @@ existing trigger behavior.
 
 Build the upload artifact with `npm run build:minitool`, then ZIP the contents
 of `dist/`. The package allowlist check and sampled-audio verification still
-apply. `scripts/verify-settings.mjs` expects the built directory served at
+apply. Mini-tool app entries use content-hashed names (`assets/app-[hash].js`)
+so an embedded browser cannot pair fresh level-selection HTML with cached gameplay
+from a previous build. The cache regression is `node --test scripts/check-minitool.test.mjs`;
+it builds in memory without replacing a running preview's `dist/`.
+`scripts/verify-settings.mjs` expects the built directory served at
 `http://127.0.0.1:8912/` and exercises portrait, landscape, pause, persistence,
 aimed firing, multi-touch holding, and touch cancellation.
 

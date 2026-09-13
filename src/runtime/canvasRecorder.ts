@@ -39,18 +39,18 @@ function drawNotebookOverlay(context: CanvasRenderingContext2D, width: number, h
   context.fillStyle = ink;
   context.strokeStyle = ink;
   context.lineWidth = 2;
-  context.font = '700 27px "Patrick Hand", "Comic Sans MS", cursive';
+  context.font = '700 27px "Ballpoint Hand", sans-serif';
   context.textAlign = 'left';
-  context.fillText(`SCORE ${pageText('[data-hud="score"]', '0')}`, 170, 48);
+  context.fillText(`得分 ${pageText('[data-hud="score"]', '0')}`, 170, 48);
   context.textAlign = 'right';
-  context.fillText(pageText('[data-hud="wave"]', 'WAVE 1'), width - 92, 48);
-  context.font = '700 20px "Patrick Hand", "Comic Sans MS", cursive';
-  context.fillText(pageText('[data-hud="enemies"]', '3 enemies left'), width - 92, 79);
+  context.fillText(pageText('[data-hud="wave"]', '第 1 波'), width - 92, 48);
+  context.font = '700 20px "Ballpoint Hand", sans-serif';
+  context.fillText(pageText('[data-hud="enemies"]', '剩余 3 名敌人'), width - 92, 79);
 
   const health = Math.max(0, Math.min(100, Number(pageText('[data-hud="health"]', '100')) || 0));
   context.textAlign = 'left';
-  context.font = '700 22px "Patrick Hand", "Comic Sans MS", cursive';
-  context.fillText('HP', 170, height - 145);
+  context.font = '700 22px "Ballpoint Hand", sans-serif';
+  context.fillText('生命', 170, height - 145);
   context.strokeRect(215, height - 160, 240, 16);
   context.save();
   context.beginPath();
@@ -64,20 +64,20 @@ function drawNotebookOverlay(context: CanvasRenderingContext2D, width: number, h
   }
   context.restore();
   context.fillText(String(health), 467, height - 145);
-  context.font = '900 52px "Patrick Hand", "Comic Sans MS", cursive';
+  context.font = '900 52px "Ballpoint Hand", sans-serif';
   context.fillText('∞', 170, height - 55);
 
   context.textAlign = 'right';
-  const weaponName = pageText('[data-hud="weapon-name"]', 'RIFLE');
+  const weaponName = pageText('[data-hud="weapon-name"]', '自动步枪');
   const ammo = pageText('[data-hud="ammo"]', '30');
   const reserve = pageText('[data-hud="reserve"]', '/150');
   const selectedSlot = document.querySelector<HTMLElement>('[data-weapon-slot].selected')?.dataset.weaponSlot ?? '1';
-  context.font = '700 18px "Patrick Hand", "Comic Sans MS", cursive';
+  context.font = '700 18px "Ballpoint Hand", sans-serif';
   context.fillText(`${selectedSlot}  ${weaponName}                         ${ammo}${reserve}`, width - 92, height - 132);
-  context.font = '900 37px "Patrick Hand", "Comic Sans MS", cursive';
+  context.font = '900 37px "Ballpoint Hand", sans-serif';
   context.fillText(weaponName, width - 92, height - 88);
-  context.font = '700 17px "Patrick Hand", "Comic Sans MS", cursive';
-  context.fillText(pageText('[data-hud="weapon-description"]', 'auto · aim for the holo sight'), width - 92, height - 58);
+  context.font = '700 17px "Ballpoint Hand", sans-serif';
+  context.fillText(pageText('[data-hud="weapon-description"]', '自动连射 · 开镜精准射击'), width - 92, height - 58);
 
   const centerX = width / 2;
   const centerY = height / 2;
@@ -114,7 +114,7 @@ function drawDemoTitles(
   elapsed: number,
   duration: number,
 ): void {
-  const title = elapsed < 2.8 ? 'BALLPOINT BREACH' : elapsed > duration - 3.2 ? 'THE PAGE FIGHTS BACK' : '';
+  const title = elapsed < 2.8 ? '纸上战场' : elapsed > duration - 3.2 ? '下一页，继续开战' : '';
   if (title) {
     const edge = elapsed < 2.8 ? Math.min(1, elapsed / 0.45, (2.8 - elapsed) / 0.55) : Math.min(1, (elapsed - duration + 3.2) / 0.55);
     context.save();
@@ -123,22 +123,22 @@ function drawDemoTitles(
     context.fillRect(0, 0, width, height);
     context.fillStyle = '#18246f';
     context.textAlign = 'center';
-    context.font = '900 112px "Patrick Hand", "Comic Sans MS", cursive';
+    context.font = '900 112px "Ballpoint Hand", sans-serif';
     context.fillText(title, width / 2, height / 2 - 6);
     context.fillStyle = '#d63b55';
-    context.font = '700 28px "Patrick Hand", "Comic Sans MS", cursive';
-    context.fillText(elapsed < 2.8 ? 'A BALLPOINT-PEN ARENA FPS · GAMEPLAY DEMO' : 'OPEN SOURCE · MADE WITH THREE.JS', width / 2, height / 2 + 62);
+    context.font = '700 28px "Ballpoint Hand", sans-serif';
+    context.fillText(elapsed < 2.8 ? '圆珠笔涂鸦射击 · 实机演示' : '代码与提示词已开源', width / 2, height / 2 + 62);
     context.restore();
     return;
   }
 
   const chapters: ReadonlyArray<[number, string]> = [
-    [3, 'RIFLE · MOVE THROUGH THE SKETCH'],
-    [18, 'SHOTGUN · INK AT CLOSE RANGE'],
-    [34, 'REVOLVER · HAND-DRAWN RECOIL'],
-    [48, 'SNIPER · SIGHTLINES ACROSS THE PAGE'],
-    [62, 'KATANA · SLASH, BLOCK, RETURN FIRE'],
-    [75, 'FINAL WAVE · THE DOODLER'],
+    [3, '自动步枪 · 穿行纸上战场'],
+    [18, '霰弹枪 · 近距离交锋'],
+    [34, '左轮手枪 · 稳住准星'],
+    [48, '狙击步枪 · 远距压制'],
+    [62, '武士刀 · 挥砍格挡，反弹来袭'],
+    [75, '最终一波 · 涂鸦魔王'],
   ];
   const active = [...chapters].reverse().find(([at]) => elapsed >= at && elapsed < at + 2.25);
   if (!active) return;
@@ -153,7 +153,7 @@ function drawDemoTitles(
   context.strokeRect(width * 0.31, height * 0.79, width * 0.38, 54);
   context.fillStyle = '#27348f';
   context.textAlign = 'center';
-  context.font = '700 25px "Patrick Hand", "Comic Sans MS", cursive';
+  context.font = '700 25px "Ballpoint Hand", sans-serif';
   context.fillText(active[1], width / 2, height * 0.79 + 35);
   context.restore();
 }
@@ -164,7 +164,7 @@ export function recordCanvas(canvas: HTMLCanvasElement, options: CanvasRecorderO
   const frameRate = Math.max(24, Math.min(60, options.frameRate ?? 60));
   const status = document.createElement('div');
   status.id = 'recording-status';
-  status.textContent = `RECORDING ${durationSeconds.toFixed(1)}s`;
+  status.textContent = `正在录制 ${durationSeconds.toFixed(1)} 秒`;
   document.body.append(status);
 
   const width = Math.max(1, Math.round(options.width ?? canvas.width));
@@ -195,7 +195,7 @@ export function recordCanvas(canvas: HTMLCanvasElement, options: CanvasRecorderO
     if (event.data.size > 0) chunks.push(event.data);
   });
   recorder.addEventListener('error', () => {
-    status.textContent = 'RECORDING FAILED';
+    status.textContent = '录制失败';
     document.documentElement.dataset.recordingError = 'true';
   });
   recorder.addEventListener('stop', () => {
@@ -206,7 +206,7 @@ export function recordCanvas(canvas: HTMLCanvasElement, options: CanvasRecorderO
     link.id = 'recording-download';
     link.href = URL.createObjectURL(blob);
     link.download = options.fileName;
-    link.textContent = 'DOWNLOAD EFFECT VIDEO';
+    link.textContent = '下载演示视频';
     status.replaceChildren(link);
     document.documentElement.dataset.recordingReady = 'true';
   });

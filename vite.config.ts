@@ -2,8 +2,10 @@ import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 import { readFileSync } from 'node:fs';
 import { buildAudioData } from './scripts/build-audio-data.mjs';
+import { checkUiFonts } from './scripts/check-ui-fonts.mjs';
 
 export default defineConfig(({ mode }) => {
+  checkUiFonts();
   const miniTool = mode === 'minitool';
   return {
     base: './',
@@ -12,6 +14,7 @@ export default defineConfig(({ mode }) => {
       alias: {
         './runtime/canvasRecorder': fileURLToPath(new URL('./src/runtime/canvasRecorder.minitool.ts', import.meta.url)),
         '../audio/AudioSystem': fileURLToPath(new URL('./src/audio/AudioSystem.minitool.ts', import.meta.url)),
+        '../social/saveBattleCard': fileURLToPath(new URL('./src/social/saveBattleCard.minitool.ts', import.meta.url)),
       },
     } : undefined,
     build: {
@@ -22,12 +25,19 @@ export default defineConfig(({ mode }) => {
         output: {
           format: 'iife',
           inlineDynamicImports: true,
-          entryFileNames: 'assets/app.js',
+          // Embedded browsers may retain JS across HTML reloads. Change the URL
+          // whenever gameplay changes, including in offline mini-tool packages.
+          entryFileNames: 'assets/app-[hash].js',
           assetFileNames: 'assets/[name]-[hash][extname]',
         },
       } : undefined,
     },
-    plugins: miniTool ? [{
+    plugins: [{
+      name: 'offline-font-licenses',
+      generateBundle() {
+        this.emitFile({ type: 'asset', fileName: 'fonts/licenses.json', source: readFileSync(new URL('./src/assets/fonts/licenses.json', import.meta.url), 'utf8') });
+      },
+    }, ...(miniTool ? [{
       name: 'mini-tool-classic-script',
       enforce: 'post',
       generateBundle() {
@@ -40,6 +50,6 @@ export default defineConfig(({ mode }) => {
           .replace(/\s+crossorigin/g, '')
           .replace('<script src=', '<script src="./audio-data.js" defer></script>\n    <script defer src=');
       },
-    }] : [],
+    }] : [])],
   };
 });

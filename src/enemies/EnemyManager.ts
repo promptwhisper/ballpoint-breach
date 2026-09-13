@@ -58,9 +58,10 @@ export class EnemyManager {
     if (this.enemies.has(id)) throw new Error(`Enemy id already exists: ${id}`);
     const seed = ((this.options.seed ?? 0x51cbb1e5) + this.serial * 0x9e3779b1) >>> 0;
     const eventSink = (event: EnemyEvent): void => this.options.onEvent?.(event);
+    const resolvedOptions = { combatProfile: this.options.getCombatProfile?.(), ...spawnOptions };
     const enemy = kind === 'boss'
-      ? new DoodlerBoss(id, position, seed, eventSink, spawnOptions, this.options.despawnDelay ?? 3.4)
-      : new DoodleEnemy(id, kind, position, seed, eventSink, spawnOptions, this.options.despawnDelay ?? 2.6);
+      ? new DoodlerBoss(id, position, seed, eventSink, resolvedOptions, this.options.despawnDelay ?? 3.4)
+      : new DoodleEnemy(id, kind, position, seed, eventSink, resolvedOptions, this.options.despawnDelay ?? 2.6);
     this.enemies.set(id, enemy);
     this.object.add(enemy.object);
     for (const tagged of enemy.rig.hitMeshes) this.hitOwners.set(tagged.mesh, { enemy, zone: tagged.zone });

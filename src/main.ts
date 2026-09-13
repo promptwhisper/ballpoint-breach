@@ -6,6 +6,8 @@ import './style.css';
 installErrorOverlay();
 
 const params = new URLSearchParams(window.location.search);
+const requestedMode = params.get('mode');
+const levelMode = requestedMode === 'fold-foundry' || requestedMode === 'dual-pages' ? requestedMode : 'classic';
 const capture = params.get('capture') === '1';
 const stress = params.get('stress') === '1';
 const demoAim = params.get('aim') === '1';
@@ -38,6 +40,7 @@ if (!canvas) throw new Error('Missing #app canvas');
 const game = (() => {
   try {
     return new Game(canvas, {
+      levelMode,
       capture,
       stress,
       demoAim,
@@ -57,8 +60,8 @@ const game = (() => {
     const overlay = document.querySelector<HTMLElement>('#game-overlay');
     const title = document.querySelector<HTMLElement>('#overlay-title');
     const copy = document.querySelector<HTMLElement>('#overlay-copy');
-    if (title) title.textContent = 'WEBGL UNAVAILABLE';
-    if (copy) copy.textContent = 'This device cannot open the 3D drawing. Try another device.';
+    if (title) title.textContent = '暂时无法进入战场';
+    if (copy) copy.textContent = '当前设备无法显示三维画面，请尝试重新打开或更换设备。';
     if (overlay) overlay.classList.add('visible');
     throw error;
   }
