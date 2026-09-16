@@ -9,6 +9,22 @@ function isFiniteVector(vector: THREE.Vector3): boolean {
   return Number.isFinite(vector.x) && Number.isFinite(vector.y) && Number.isFinite(vector.z);
 }
 
+test('all three ink arenas use the same ground wash material', () => {
+  for (const levelMode of ['classic', 'fold-foundry', 'dual-pages'] as const) {
+    const arena = new ArenaBuilder({ levelMode }).build();
+    try {
+      const floorName = levelMode === 'classic' ? 'main-ground-surface' : 'challenge-floor-surface';
+      const floor = arena.root.getObjectByName(floorName);
+      assert.ok(floor instanceof THREE.Mesh, `${levelMode} must expose its main floor surface`);
+      assert.ok(floor.material instanceof THREE.MeshBasicMaterial);
+      assert.equal(floor.material.name, 'pale-ink-earth');
+      assert.ok(floor.material.map, `${levelMode} must use the shared pale ground texture`);
+    } finally {
+      arena.dispose();
+    }
+  }
+});
+
 test('arena exposes complete gameplay contracts and valid AABB colliders', () => {
   const arena = new ArenaBuilder({ outlineIrregularity: 0.003 }).build();
   try {

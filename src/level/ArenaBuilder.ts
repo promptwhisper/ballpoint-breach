@@ -523,6 +523,17 @@ class ArenaAssembler {
     return geometry;
   }
 
+  private applyGroundWash(visual: OutlinedMeshGroup): void {
+    if (!INK_STYLE_ACTIVE || ACTIVE_INK_VERSION !== 'v5') return;
+    this.groundWashMaterial ??= new THREE.MeshBasicMaterial({
+      name: 'pale-ink-earth',
+      map: getInkAtmosphereTexture('ground'),
+      color: 0xffffff,
+      fog: true,
+    });
+    visual.mesh.material = this.groundWashMaterial;
+  }
+
   private addOutlined(
     parent: THREE.Object3D,
     id: string,
@@ -744,15 +755,7 @@ class ArenaAssembler {
       collider: 'ground',
       tags: ['safe-floor'],
     });
-    if (INK_STYLE_ACTIVE && ACTIVE_INK_VERSION === 'v5') {
-      this.groundWashMaterial = new THREE.MeshBasicMaterial({
-        name: 'pale-ink-earth',
-        map: getInkAtmosphereTexture('ground'),
-        color: 0xffffff,
-        fog: true,
-      });
-      ground.mesh.material = this.groundWashMaterial;
-    }
+    this.applyGroundWash(ground);
     this.addBox(group, 'rear-perimeter', new THREE.Vector3(72, 7.2, 0.55), new THREE.Vector3(0, 3.6, -46), 'deep', {
       collider: 'wall',
       tags: ['perimeter'],
@@ -1315,7 +1318,8 @@ class ArenaAssembler {
   }
 
   private challengeBounds(width: number, depth: number, z: number): void {
-    this.challengeBox(this.root, 'challenge-floor', 0, -0.2, z, width, 0.4, depth, 'paper', 'ground');
+    const floor = this.challengeBox(this.root, 'challenge-floor', 0, -0.2, z, width, 0.4, depth, 'paper', 'ground');
+    this.applyGroundWash(floor);
     for (const side of [-1, 1]) {
       this.challengeBox(this.root, `boundary-side-${side}`, side * width / 2, 2.8, z, 0.45, 5.6, depth, 'shade', 'wall');
       this.challengeBox(this.root, `boundary-end-${side}`, 0, 2.8, z + side * depth / 2, width, 5.6, 0.45, 'shade', 'wall');

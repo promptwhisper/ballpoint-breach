@@ -70,12 +70,12 @@ export interface WaveDirectorOptions {
   onRecovery?: (recovery: WaveRecovery) => void;
   clearEnemies?: () => void;
   definitions?: readonly WaveDefinition[];
+  recovery?: Readonly<Pick<WaveRecovery, 'healthFraction' | 'ammoFraction'>>;
   seed?: number;
   announcementDuration?: number;
   intermissionDuration?: number;
   canAdvanceToWave?: (wave: number) => boolean;
   interleaveKinds?: boolean;
-  recovery?: Pick<WaveRecovery, 'healthFraction' | 'ammoFraction'>;
 }
 
 export interface WaveDirectorSnapshot {
@@ -84,6 +84,8 @@ export interface WaveDirectorSnapshot {
   subtitle: string;
   queued: number;
   active: number;
+  maxConcurrent: number;
+  spawnInterval: number;
   enemiesRemaining: number;
   intermissionRemaining: number;
   victory: boolean;

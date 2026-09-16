@@ -6,6 +6,7 @@ import type {
   WaveDirectorSnapshot,
   WaveDirectorState,
   WaveEvent,
+  WaveRecovery,
   WaveSpawnPoint,
 } from './types';
 
@@ -118,15 +119,18 @@ export class WaveDirector {
   private spawnTimer = 0;
   private spawnOrdinal = 0;
   private queuedKinds: EnemyKind[] = [];
+  private readonly spawnedKindCounts = new Map<EnemyKind, number>();
   private readonly trackedEnemyIds = new Set<string>();
   private readonly recentSpawnPointIds: string[] = [];
   private random: () => number;
+  private activeDefinitions: readonly WaveDefinition[];
 
   constructor(private readonly options: WaveDirectorOptions) {
     if (options.spawnPoints.length === 0) throw new Error('WaveDirector requires at least one spawn point');
     const definitions = options.definitions ?? DEFAULT_WAVES;
     if (definitions.length === 0) throw new Error('WaveDirector requires at least one wave');
     this.validateDefinitions(definitions);
+    this.activeDefinitions = definitions;
     this.random = createRandom(options.seed ?? 0x5c71bb1e);
   }
 
@@ -189,6 +193,34 @@ export class WaveDirector {
     this.trackedEnemyIds.delete(enemyId);
   }
 
+  configure(
+    definitions: readonly WaveDefinition[],
+    recovery?: Pick<WaveRecovery, 'healthFraction' | 'ammoFraction'>,
+  ): void {
+    if (definitions.length === 0) throw new Error('WaveDirector requires at least one wave');
+    this.validateDefinitions(definitions);
+    const currentWave = this.currentDefinition?.number ?? 0;
+    const nextIndex = currentWave > 0
+      ? definitions.findIndex(definition => definition.number === currentWave)
+      : this.waveIndex;
+    if (currentWave > 0 && nextIndex < 0) throw new Error(`Reconfigured definitions omit active wave ${currentWave}`);
+    this.activeDefinitions = definitions;
+    this.options.recovery = recovery;
+    if (currentWave > 0) this.waveIndex = nextIndex;
+    if (this.currentState !== 'spawning' && this.currentState !== 'combat') return;
+    const definition = this.currentDefinition;
+    if (!definition) return;
+    this.queuedKinds = this.buildQueue(definition, true);
+    if (this.queuedKinds.length > 0) {
+      if (this.currentState === 'combat') this.spawnTimer = 0;
+      else this.spawnTimer = Math.min(Math.max(0, this.spawnTimer), definition.spawnInterval);
+      this.currentState = 'spawning';
+    } else {
+      this.currentState = 'combat';
+      this.spawnTimer = 0;
+    }
+  }
+
   chooseSpawnPoint(kind: EnemyKind): WaveSpawnPoint {
     const playerPosition = this.options.getPlayerPosition?.();
     let candidates = this.preferredPoints(kind);
@@ -225,6 +257,8 @@ export class WaveDirector {
       subtitle: definition?.subtitle ?? '',
       queued: this.queuedKinds.length,
       active: this.options.getActiveEnemyCount(),
+      maxConcurrent: definition?.maxConcurrent ?? 0,
+      spawnInterval: definition?.spawnInterval ?? 0,
       enemiesRemaining: this.enemiesRemaining,
       intermissionRemaining: this.currentState === 'intermission' ? Math.max(0, intermissionDuration - this.stateTime) : 0,
       victory: this.victory,
@@ -239,6 +273,7 @@ export class WaveDirector {
     this.spawnTimer = 0;
     this.spawnOrdinal = 0;
     this.queuedKinds = [];
+    this.spawnedKindCounts.clear();
     this.trackedEnemyIds.clear();
     this.recentSpawnPointIds.length = 0;
     this.random = createRandom(this.options.seed ?? 0x5c71bb1e);
@@ -246,7 +281,7 @@ export class WaveDirector {
   }
 
   private get definitions(): readonly WaveDefinition[] {
-    return this.options.definitions ?? DEFAULT_WAVES;
+    return this.activeDefinitions;
   }
 
   private get currentDefinition(): WaveDefinition | null {
@@ -265,24 +300,14 @@ export class WaveDirector {
     this.spawnTimer = 0;
     this.spawnOrdinal = 0;
     this.queuedKinds = [];
+    this.spawnedKindCounts.clear();
     this.emit('announcement', { duration: this.options.announcementDuration ?? 2.15 });
   }
 
   private beginSpawning(): void {
     const definition = this.currentDefinition;
     if (!definition) return;
-    this.queuedKinds = definition.composition.flatMap((group) => Array.from({ length: group.count }, () => group.kind));
-    if (this.options.interleaveKinds) {
-      const squads = definition.composition.map(group => ({ ...group }));
-      this.queuedKinds = [];
-      while (squads.some(group => group.count > 0)) {
-        for (const group of squads) {
-          if (group.count <= 0) continue;
-          this.queuedKinds.push(group.kind);
-          group.count -= 1;
-        }
-      }
-    }
+    this.queuedKinds = this.buildQueue(definition, false);
     this.currentState = 'spawning';
     this.stateTime = 0;
     this.spawnTimer = 0;
@@ -309,6 +334,7 @@ export class WaveDirector {
         spawnPointId: point.id,
       });
       const enemyId = enemyIdOf(reference, fallbackId);
+      this.spawnedKindCounts.set(kind, (this.spawnedKindCounts.get(kind) ?? 0) + 1);
       this.trackedEnemyIds.add(enemyId);
       this.emit('enemy-spawned', { kind, enemyId, spawnPointId: point.id });
       this.spawnTimer += definition.spawnInterval;
@@ -325,7 +351,8 @@ export class WaveDirector {
     if (!definition) return;
     this.trackedEnemyIds.clear();
     this.emit('wave-clear');
-    this.options.onRecovery?.({ wave: definition.number, healthFraction: 0.16, ammoFraction: 0.32, ...this.options.recovery });
+    const recovery = this.options.recovery ?? { healthFraction: 0.16, ammoFraction: 0.32 };
+    this.options.onRecovery?.({ wave: definition.number, ...recovery });
     if (this.waveIndex >= this.definitions.length - 1) {
       this.currentState = 'victory';
       this.stateTime = 0;
@@ -335,6 +362,27 @@ export class WaveDirector {
     this.currentState = 'intermission';
     this.stateTime = 0;
     this.emit('intermission', { duration: this.options.intermissionDuration ?? 4.25 });
+  }
+
+  private buildQueue(definition: WaveDefinition, subtractSpawned: boolean): EnemyKind[] {
+    const remainingSpawned = new Map(this.spawnedKindCounts);
+    const groups = definition.composition.map(group => {
+      const used = subtractSpawned ? Math.min(group.count, remainingSpawned.get(group.kind) ?? 0) : 0;
+      remainingSpawned.set(group.kind, (remainingSpawned.get(group.kind) ?? 0) - used);
+      return { kind: group.kind, count: group.count - used };
+    });
+    if (!this.options.interleaveKinds) {
+      return groups.flatMap(group => Array.from({ length: group.count }, () => group.kind));
+    }
+    const queue: EnemyKind[] = [];
+    while (groups.some(group => group.count > 0)) {
+      for (const group of groups) {
+        if (group.count <= 0) continue;
+        queue.push(group.kind);
+        group.count -= 1;
+      }
+    }
+    return queue;
   }
 
   private preferredPoints(kind: EnemyKind): WaveSpawnPoint[] {

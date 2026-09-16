@@ -163,3 +163,46 @@ test('challenge recovery is configurable while classic recovery remains unchange
     assert.equal(observed?.ammoFraction, recovery?.ammoFraction ?? 0.32);
   }
 });
+
+test('difficulty reconfiguration preserves the active wave roster while changing pacing and recovery', () => {
+  let active = 0;
+  let recovery: { healthFraction: number; ammoFraction: number } | undefined;
+  const challenge = [{
+    number: 1, subtitle: 'live difficulty',
+    composition: [{ kind: 'boss' as const, count: 1 }, { kind: 'grunt' as const, count: 5 }],
+    spawnInterval: 0.2, maxConcurrent: 2,
+  }];
+  const relaxed = [{
+    number: 1, subtitle: 'live difficulty',
+    composition: [{ kind: 'boss' as const, count: 1 }, { kind: 'grunt' as const, count: 5 }],
+    spawnInterval: 0.5, maxConcurrent: 1,
+  }];
+  const director = new WaveDirector({
+    spawnPoints: makeSpawnPoints(), definitions: challenge, announcementDuration: 0,
+    getActiveEnemyCount: () => active,
+    spawnEnemy: () => { active += 1; },
+    onRecovery: event => { recovery = event; },
+  });
+  director.start();
+  director.update(0.01);
+  director.update(0.25);
+  assert.equal(active, 2);
+  assert.equal(director.getSnapshot().queued, 4);
+
+  director.configure(relaxed, { healthFraction: 0.22, ammoFraction: 0.38 });
+  assert.equal(director.state, 'spawning');
+  assert.equal(director.getSnapshot().queued, 4, 'every authored reinforcement must remain queued');
+  assert.equal(director.getSnapshot().maxConcurrent, 1);
+  assert.equal(director.getSnapshot().spawnInterval, 0.5);
+  active = 0;
+  director.update(0.5);
+  assert.equal(active, 1);
+  assert.equal(director.getSnapshot().queued, 3);
+  for (let tick = 0; tick < 8 && !director.victory; tick += 1) {
+    active = 0;
+    director.update(0.5);
+  }
+  assert.equal(director.victory, true);
+  assert.equal(recovery?.healthFraction, 0.22);
+  assert.equal(recovery?.ammoFraction, 0.38);
+});

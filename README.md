@@ -91,9 +91,10 @@ instructions and client-validation limits are in [AUDIO_CREDITS.md](AUDIO_CREDIT
 ### Mobile settings
 
 The settings panel pauses an active round and resumes it when closed. Sound
-preferences, touch-look sensitivity (0.5–4.0×, default 1.8× the original speed),
-and firing mode persist locally when the host allows storage. Mouse sensitivity
-and movement joystick speed are unchanged.
+preferences, touch-look sensitivity (0.5–4.0×, default 3.5×), firing mode,
+automatic fire, difficulty, and custom touch-control positions persist locally
+when the host allows storage. Mouse sensitivity and movement joystick speed are
+unchanged.
 
 Right-screen firing remains the default: tap to fire, hold for automatic fire,
 and drag to look. Dedicated-button mode makes the screen look-only and shows

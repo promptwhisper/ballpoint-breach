@@ -52,27 +52,61 @@
     <section id="settings-panel" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <div class="settings-card">
         <header><h2 id="settings-title">操作设置</h2><button id="settings-close" type="button">完成</button></header>
-        <div class="settings-row"><span>游戏音效</span><button id="sound-toggle" type="button" aria-pressed="true">已开启</button></div>
-        <label class="sensitivity-label" for="look-sensitivity">视角灵敏度 <output id="sensitivity-value" for="look-sensitivity">3.0 倍</output></label>
-        <input id="look-sensitivity" type="range" min="0.5" max="4" step="0.1" value="3">
-        <p class="settings-help">左右滑动调节，越大转向越快；1.0 倍为原版速度。</p>
-        <fieldset><legend>开火方式</legend>
-          <label><input type="radio" name="fire-mode" value="screen" checked><span>右侧屏幕<small>轻点射击，按住连射，滑动转向</small></span></label>
-          <label><input type="radio" name="fire-mode" value="button"><span>独立按钮<small>屏幕只转向，按射击键开火</small></span></label>
-        </fieldset>
-        <p class="settings-help">设置自动保存 · 调整期间暂停战局</p>
+        <div class="settings-columns">
+          <div class="settings-column">
+            <div class="settings-row"><span>游戏音效</span><button id="sound-toggle" type="button" aria-pressed="true">已开启</button></div>
+            <label class="sensitivity-label" for="look-sensitivity">视角灵敏度 <output id="sensitivity-value" for="look-sensitivity">3.5 倍</output></label>
+            <input id="look-sensitivity" type="range" min="0.5" max="4" step="0.1" value="3.5">
+            <p class="settings-help">滑动调节，越大转向越快。</p>
+            <fieldset><legend>开火方式</legend>
+              <label><input type="radio" name="fire-mode" value="screen" checked><span>右侧点按<small>轻点射击，滑动转向</small></span></label>
+              <label><input type="radio" name="fire-mode" value="button"><span>独立射击键<small>屏幕只负责转向</small></span></label>
+            </fieldset>
+            <label class="settings-check"><input id="auto-fire" type="checkbox"><span>自动开火<small>准星对准敌人即开枪</small></span></label>
+          </div>
+          <div class="settings-column">
+            <fieldset><legend>战局难度</legend>
+              <label><input type="radio" name="difficulty" value="relaxed" checked><span>休闲<small>敌人不减，攻势更缓、伤害更低</small></span></label>
+              <label><input type="radio" name="difficulty" value="standard"><span>标准<small>完整敌群，中等压迫感</small></span></label>
+              <label><input type="radio" name="difficulty" value="challenge"><span>挑战<small>原版节奏与伤害</small></span></label>
+            </fieldset>
+            <div class="control-layout-row">
+              <span>操作键位<small>移动、射击、跳跃、换枪、瞄准均可拖动</small></span>
+              <button id="edit-controls" type="button">调整位置</button>
+            </div>
+            <button id="reset-controls" class="settings-secondary" type="button">恢复默认键位</button>
+            <p class="settings-help settings-save-note">设置自动保存 · 调整期间战局暂停</p>
+          </div>
+        </div>
       </div>
     </section>
+    <section id="control-layout-editor" hidden aria-label="调整操作键位">
+      <div><strong>拖动各个按钮到顺手位置</strong><small>五个键位都可以调整</small></div>
+      <button id="finish-controls" type="button">保存位置</button>
+    </section>
+
+    <section id="update-guide" hidden role="dialog" aria-modal="true" aria-labelledby="update-guide-title">
+      <div class="update-guide-card">
+        <p>本次更新</p>
+        <h2 id="update-guide-title">整装再入墨阵</h2>
+        <div class="update-guide-items">
+          <article><strong>难度可调</strong><span>完整敌群，休闲档攻势更缓、伤害更低</span></article>
+          <article><strong>自动开火</strong><span>准星对准敌人即可自动开枪</span></article>
+          <article><strong>键位自定</strong><span>五个操作键可拖到顺手位置</span></article>
+        </div>
+        <small>入阵后点右侧齿轮可随时调整</small>
+        <button id="update-guide-dismiss" type="button">知晓 · 入阵</button>
+      </div>
+    </section>
+
     <section id="touch-controls" aria-label="触控操作">
       <button class="action-fire" type="button" data-touch-action="fire" aria-label="射击"><span>◎</span><small>射击</small></button>
       <div class="touch-move" data-touch-joystick role="button" aria-label="移动摇杆">
         <i class="touch-stick" aria-hidden="true"></i>
       </div>
-      <div class="touch-actions" aria-label="操作按钮">
-        <button class="action-jump" type="button" data-touch-action="jump" aria-label="跳跃"><span>↥</span><small>跳跃</small></button>
-        <button class="action-weapon" type="button" data-touch-action="weapon" aria-label="切换武器"><span>↻</span><small>换枪</small></button>
-        <button class="action-aim" type="button" data-touch-action="aim" aria-label="瞄准"><span>⌾</span><small>瞄准</small></button>
-      </div>
+      <button class="action-jump" type="button" data-touch-action="jump" aria-label="跳跃"><span>↥</span><small>跳跃</small></button>
+      <button class="action-weapon" type="button" data-touch-action="weapon" aria-label="切换武器"><span>↻</span><small>换枪</small></button>
+      <button class="action-aim" type="button" data-touch-action="aim" aria-label="瞄准"><span>⌾</span><small>瞄准</small></button>
     </section>
 
     <section id="game-overlay" class="visible" data-mode="loading">

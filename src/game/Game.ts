@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SettingsPanel } from '../ui/SettingsPanel';
+import { readPlayerSettings, SettingsPanel, type Difficulty, type PlayerSettings } from '../ui/SettingsPanel';
 import { AudioSystem, type GameSound } from '../audio/AudioSystem';
 import {
   WEAPON_DEFINITIONS,
@@ -37,6 +37,8 @@ import { ACTIVE_INK_VERSION } from '../render/inkSettings';
 import { ACTIVE_VISUAL_STYLE } from '../render/visualStyle';
 import { composeBattleCard, type BattleCardStats } from '../social/BattleCard';
 import { saveBattleCard, saveBattleCardError } from '../social/saveBattleCard';
+import { DIFFICULTY_PROFILES, scaleWaveDefinitions } from './Difficulty';
+import { UpdateGuide } from '../ui/UpdateGuide';
 
 const BASE_FOV = 68;
 const PLAYER_CENTER_HEIGHT = 0.95;
@@ -68,10 +70,20 @@ export interface PublicGameSnapshot {
   waveState: string;
   score: number;
   wave: number;
+  waveQueued: number;
+  waveRemaining: number;
+  waveMaxConcurrent: number;
+  waveSpawnInterval: number;
   enemies: number;
   playerHealth: number;
   activeWeapon: WeaponId;
+  difficulty: Difficulty;
+  incomingDamageScale: number;
+  enemyTimeScale: number;
+  outgoingDamageScale: number;
+  autoFire: boolean;
   rendererObjects: number;
+  rendererFrame: number;
   effects: ReturnType<EffectPool['getSnapshot']>;
 }
 
@@ -187,6 +199,7 @@ export class Game {
   private movementAudioPrimed = false;
   private roundStats: BattleCardStats = this.createRoundStats();
   private savingBattleCard = false;
+  private difficulty: Difficulty = readPlayerSettings().difficulty;
 
   constructor(readonly canvas: HTMLCanvasElement, options: GameOptions = {}) {
     this.levelMode = options.levelMode ?? 'classic';
@@ -328,9 +341,7 @@ export class Game {
       clearEnemies: () => this.enemies.reset(),
       onEvent: (event) => this.handleWaveEvent(event),
       onRecovery: (recovery) => this.handleRecovery(recovery),
-      definitions: this.autoplay
-        ? this.waveDefinitions().map((definition) => ({ ...definition, spawnInterval: 0.025 }))
-        : this.levelMode === 'classic' ? undefined : this.waveDefinitions(),
+      definitions: this.difficultyDefinitions(),
       canAdvanceToWave: (wave) => {
         if (this.autoplay || this.levelMode === 'classic') return true;
         const objective = this.arena.objectives?.find(o => o.firstWave === wave);
@@ -339,8 +350,20 @@ export class Game {
       announcementDuration: this.autoplay ? 0.06 : undefined,
       intermissionDuration: this.autoplay ? 0.08 : undefined,
       interleaveKinds: this.levelMode !== 'classic',
-      recovery: this.levelMode === 'classic' ? undefined : { healthFraction: 0.06, ammoFraction: 0.14 },
+      recovery: this.difficultyRecovery(),
     });
+  }
+
+  private difficultyDefinitions() {
+    const definitions = this.waveDefinitions();
+    return this.autoplay
+      ? definitions.map(definition => ({ ...definition, spawnInterval: 0.025 }))
+      : scaleWaveDefinitions(definitions, this.difficulty);
+  }
+
+  private difficultyRecovery(): Readonly<{ healthFraction: number; ammoFraction: number }> {
+    const profile = DIFFICULTY_PROFILES[this.difficulty];
+    return { healthFraction: profile.healthRecovery, ammoFraction: profile.ammoRecovery };
   }
 
   startForCapture(): void {
@@ -399,6 +422,7 @@ export class Game {
 
   getSnapshot(): PublicGameSnapshot {
     const weapon = this.weapons.getSnapshot();
+    const wave = this.waves.getSnapshot();
     return {
       mode: this.state.mode,
       level: this.levelMode,
@@ -406,10 +430,20 @@ export class Game {
       waveState: this.waves.state,
       score: this.state.score,
       wave: this.state.wave,
+      waveQueued: wave.queued,
+      waveRemaining: wave.enemiesRemaining,
+      waveMaxConcurrent: wave.maxConcurrent,
+      waveSpawnInterval: wave.spawnInterval,
       enemies: this.enemies.livingCount,
       playerHealth: this.player.health,
       activeWeapon: weapon.activeWeapon,
+      difficulty: this.difficulty,
+      incomingDamageScale: DIFFICULTY_PROFILES[this.difficulty].incomingDamageScale,
+      enemyTimeScale: DIFFICULTY_PROFILES[this.difficulty].enemyTimeScale,
+      outgoingDamageScale: DIFFICULTY_PROFILES[this.difficulty].outgoingDamageScale,
+      autoFire: this.settings?.values.autoFire ?? false,
       rendererObjects: this.renderer.info.render.calls,
+      rendererFrame: this.renderer.info.render.frame,
       effects: this.effects.getSnapshot(),
     };
   }
@@ -418,6 +452,7 @@ export class Game {
     this.controlRequest += 1;
     this.pointerLockRequested = false;
     this.settings?.dispose();
+    this.updateGuide?.dispose();
     cancelAnimationFrame(this.requestId);
     if (this.deathFlashTimeout !== null) window.clearTimeout(this.deathFlashTimeout);
     document.body.classList.remove('death-hit');
@@ -447,6 +482,7 @@ export class Game {
   }
 
   private installEvents(): void {
+    this.updateGuide = new UpdateGuide(this.captureMode || this.autoplay || this.showcaseMode || this.demoReelMode);
     this.settings = new SettingsPanel(this.input, () => {
       this.resumeAfterSettings = this.state.mode === 'playing' || this.pointerLockRequested;
       if (this.resumeAfterSettings) {
@@ -461,7 +497,8 @@ export class Game {
         this.audio.resume(); this.requestGameplayControl();
       }
       this.resumeAfterSettings = false;
-    });
+    }, this.handleSettingsChange);
+    this.difficulty = this.settings.values.difficulty;
     if (!this.settings.values.soundEnabled) this.audio.setEnabled(false);
     window.addEventListener('resize', this.resize);
     document.addEventListener('visibilitychange', this.handleVisibilityChange);
@@ -484,7 +521,19 @@ export class Game {
   }
 
   private settings?: SettingsPanel;
+  private updateGuide?: UpdateGuide;
   private resumeAfterSettings = false;
+
+  private readonly handleSettingsChange = (settings: Readonly<PlayerSettings>): void => {
+    const changedDifficulty = settings.difficulty !== this.difficulty;
+    this.difficulty = settings.difficulty;
+    if (!changedDifficulty) return;
+    this.waves.configure(this.difficultyDefinitions(), this.difficultyRecovery());
+    if (this.state.mode !== 'start') {
+      const name = settings.difficulty === 'relaxed' ? '休闲' : settings.difficulty === 'standard' ? '标准' : '挑战';
+      this.hud.showTip(`已切换为${name} · 当前阵势立即生效`, 2.4);
+    }
+  };
 
   private readonly handleAudioGesture = (event: Event): void => {
     if (!event.isTrusted || this.state.mode !== 'playing' || document.hidden) return;
@@ -633,12 +682,12 @@ export class Game {
       this.input.setPointerFallback(true);
       this.capturePlayback = false;
       if (this.state.mode === 'start' || this.state.mode === 'paused') this.setMode('playing');
-      this.hud.showTip(
-        this.settings?.values.fireMode === 'button'
+      const tip = this.settings?.values.autoFire
+        ? '自动射击已开启 · 将准星移到敌人身上'
+        : this.settings?.values.fireMode === 'button'
           ? '滑动屏幕转向 · 按射击键开火 · 利用掩体交战'
-          : '点击右侧射击 · 滑动转向 · 利用掩体交战',
-        5.2,
-      );
+          : '点击右侧射击 · 滑动转向 · 利用掩体交战';
+      this.hud.showTip(tip, 5.2);
       return;
     }
 
@@ -739,16 +788,21 @@ export class Game {
     this.previousTime = time;
     this.smoothedFps = THREE.MathUtils.lerp(this.smoothedFps, realDelta > 0 ? 1 / realDelta : 60, 0.045);
     this.updatePerformanceTier(realDelta);
+    const settingsOpen = this.settings?.isOpen ?? false;
     if (this.state.mode === 'playing') {
       this.updatePlaying(realDelta);
     } else {
       this.input.consumeFrame();
-      this.arena.update(realDelta);
-      this.effects.update(realDelta);
+      if (!settingsOpen) {
+        this.arena.update(realDelta);
+        this.effects.update(realDelta);
+      }
     }
     this.hud.update(realDelta);
-    this.updateStage(time);
-    this.renderFrame();
+    if (!settingsOpen) {
+      this.updateStage(time);
+      this.renderFrame();
+    }
     this.requestId = this.pageVisible && !this.contextLost ? requestAnimationFrame(this.frame) : 0;
   };
 
@@ -829,7 +883,11 @@ export class Game {
     }
     this.fireDemoTimer += realDelta;
     const fireDemoTrigger = this.qaFireDemo && this.fireDemoTimer >= 0.55 && this.fireDemoTimer <= 0.63;
-    this.weapons.setTrigger(controlActive && (input.primary || showcaseSlash || fireDemoTrigger));
+    const beforeWeaponUpdate = this.weapons.getSnapshot();
+    const definition = WEAPON_DEFINITIONS[beforeWeaponUpdate.activeWeapon];
+    const autoTarget = controlActive && Boolean(this.settings?.values.autoFire) && definition.fireMode !== 'melee' && this.hasAutoFireTarget(definition.range);
+    const autoTrigger = autoTarget && (definition.fireMode === 'automatic' || beforeWeaponUpdate.phase === 'idle');
+    this.weapons.setTrigger(controlActive && (input.primary || showcaseSlash || fireDemoTrigger || autoTrigger));
     this.weapons.setAimHeld(controlActive && (input.secondary || this.demoAim));
     this.weapons.update(simulationDelta);
     const weaponSnapshot = this.weapons.getSnapshot();
@@ -838,7 +896,7 @@ export class Game {
 
     this.tryReflectProjectile(weaponSnapshot.katana.blocking);
     this.waves.update(simulationDelta);
-    if (this.state.mode === 'playing') this.enemies.update(simulationDelta);
+    if (this.state.mode === 'playing') this.enemies.update(simulationDelta * DIFFICULTY_PROFILES[this.difficulty].enemyTimeScale);
     if (this.autoplay && this.state.mode === 'playing') this.updateAutoplay(simulationDelta);
     this.arena.updateTactics?.(simulationDelta, [this.player.body.position, ...this.enemies.getLivingEnemies().map(e => e.position)]);
     this.updateObjectiveHud();
@@ -927,7 +985,7 @@ export class Game {
     const enemyHit = this.enemies.raycast(this.raycaster, range);
     if (enemyHit && (!worldHit || enemyHit.distance < worldHit.distance - 0.025)) {
       const result = this.enemies.applyDamage(enemyHit, {
-        amount: damage,
+        amount: damage * DIFFICULTY_PROFILES[this.difficulty].outgoingDamageScale,
         type: damageType(weaponId),
         hitZone: enemyHit.hitZone,
         point: enemyHit.point,
@@ -970,6 +1028,15 @@ export class Game {
     return { hit: false, headshot: false, endpoint: origin.clone().addScaledVector(direction, range) };
   }
 
+  private hasAutoFireTarget(range: number): boolean {
+    this.raycaster.set(this.aimOrigin, this.aimDirection);
+    this.raycaster.far = range;
+    const enemyHit = this.enemies.raycast(this.raycaster, range);
+    if (!enemyHit) return false;
+    const worldHit = this.queries.firstWorldHit(this.raycaster, range);
+    return !worldHit || enemyHit.distance < worldHit.distance - 0.025;
+  }
+
   private handleMelee(request: MeleeRequest): void {
     const threshold = Math.cos(request.arcRadians * 0.5);
     let hit = false;
@@ -982,7 +1049,7 @@ export class Game {
       const direction = delta.multiplyScalar(1 / distance);
       if (direction.dot(request.direction) < threshold || !this.queries.hasLineOfSight(request.origin, enemy.position.clone().setY(enemy.position.y + 1))) continue;
       const result = this.enemies.applyDamage(enemy.id, {
-        amount: request.damage,
+        amount: request.damage * DIFFICULTY_PROFILES[this.difficulty].outgoingDamageScale,
         type: 'melee',
         point: enemy.position.clone().add(new THREE.Vector3(0, 1.05, 0)),
         direction: request.direction,
@@ -1072,7 +1139,7 @@ export class Game {
     if (this.state.mode !== 'playing') return;
     const weapon = this.weapons.getSnapshot();
     const blocked = weapon.activeWeapon === 'katana' && weapon.katana.blocking && event.projectileId !== undefined;
-    const mitigatedDamage = event.amount * (blocked ? 0.24 : this.levelMode === 'classic' ? 0.72 : 1);
+    const mitigatedDamage = event.amount * (blocked ? 0.24 : 0.72 * DIFFICULTY_PROFILES[this.difficulty].incomingDamageScale);
     const amount = this.capturePlayback ? 0 : mitigatedDamage;
     const dead = this.player.applyDamage(amount);
     this.audio.play('hurt');
@@ -1218,12 +1285,14 @@ export class Game {
   }
 
   private handleSupply(event: SupplyPickupEvent): void {
-    if (event.health > 0) this.player.heal(event.health);
+    const supplyScale = DIFFICULTY_PROFILES[this.difficulty].supplyScale;
+    if (event.health > 0) this.player.heal(event.health * supplyScale);
     if (event.ammo > 0) {
-      this.weapons.addReserveAmmo('rifle', event.ammo);
-      this.weapons.addReserveAmmo('shotgun', Math.max(2, Math.round(event.ammo * 0.22)));
-      this.weapons.addReserveAmmo('revolver', Math.max(3, Math.round(event.ammo * 0.3)));
-      this.weapons.addReserveAmmo('sniper', Math.max(2, Math.round(event.ammo * 0.18)));
+      const ammo = Math.round(event.ammo * supplyScale);
+      this.weapons.addReserveAmmo('rifle', ammo);
+      this.weapons.addReserveAmmo('shotgun', Math.max(2, Math.round(ammo * 0.22)));
+      this.weapons.addReserveAmmo('revolver', Math.max(3, Math.round(ammo * 0.3)));
+      this.weapons.addReserveAmmo('sniper', Math.max(2, Math.round(ammo * 0.18)));
     }
     this.effects.spawnBurst(this.player.body.position.clone().add(new THREE.Vector3(0, 0.7, 0)), 'green', 0.34, 0.42);
     this.audio.play('pickup');
